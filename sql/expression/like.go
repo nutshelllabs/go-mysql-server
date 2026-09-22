@@ -23,6 +23,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/dolthub/vitess/go/mysql"
+	"github.com/dolthub/vitess/go/vt/sqlparser"
 
 	"github.com/dolthub/go-mysql-server/sql"
 	"github.com/dolthub/go-mysql-server/sql/types"
@@ -32,9 +33,12 @@ import (
 type Like struct {
 	BinaryExpressionStub
 	Escape sql.Expression
-	pool   *sync.Pool
-	once   sync.Once
-	cached bool
+	// LikePattern holds the LIKE decision for a string-literal
+	// pattern.
+	LikePattern *sqlparser.LikePattern
+	pool        *sync.Pool
+	once        sync.Once
+	cached      bool
 }
 
 var _ sql.Expression = (*Like)(nil)
@@ -47,6 +51,12 @@ type likeMatcherErrTuple struct {
 
 // NewLike creates a new LIKE expression.
 func NewLike(left, right, escape sql.Expression) sql.Expression {
+	return NewLikeWithPattern(left, right, escape, nil)
+}
+
+// NewLikeWithPattern creates a LIKE expression carrying |pattern|
+// as its LIKE decision.
+func NewLikeWithPattern(left, right, escape sql.Expression, pattern *sqlparser.LikePattern) sql.Expression {
 	var cached = true
 	sql.Inspect(nil /*ctx isn't used here*/, right, func(_ *sql.Context, e sql.Expression) bool {
 		if _, ok := e.(*GetField); ok {
@@ -58,6 +68,7 @@ func NewLike(left, right, escape sql.Expression) sql.Expression {
 	return &Like{
 		BinaryExpressionStub: BinaryExpressionStub{left, right},
 		Escape:               escape,
+		LikePattern:          pattern,
 		pool:                 nil,
 		once:                 sync.Once{},
 		cached:               cached,
@@ -204,7 +215,7 @@ func (l *Like) WithChildren(ctx *sql.Context, children ...sql.Expression) (sql.E
 	if len(children) != 2 {
 		return nil, sql.ErrInvalidChildrenNumber.New(l, len(children), 2)
 	}
-	return NewLike(children[0], children[1], l.Escape), nil
+	return NewLikeWithPattern(children[0], children[1], l.Escape, l.LikePattern), nil
 }
 
 func patternToGoRegex(pattern string) string {

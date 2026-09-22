@@ -5105,6 +5105,39 @@ SELECT * FROM cte WHERE  d = 2;`,
 		},
 	},
 	{
+		// https://github.com/dolthub/dolt/issues/11903
+		Query: `select 'a_b' like 'a\_b'`,
+		Expected: []sql.Row{
+			{true},
+		},
+	},
+	{
+		Query: `select 'axb' like 'a\_b'`,
+		Expected: []sql.Row{
+			{false},
+		},
+	},
+	{
+		Query: `select 'a%b' like 'a\%b'`,
+		Expected: []sql.Row{
+			{true},
+		},
+	},
+	{
+		Query: `select 'axyb' like 'a\%b'`,
+		Expected: []sql.Row{
+			{false},
+		},
+	},
+	{
+		Query:    `select length('a\_b')`,
+		Expected: []sql.Row{{4}},
+	},
+	{
+		Query:    `select 'a\_b'`,
+		Expected: []sql.Row{{"a\\_b"}},
+	},
+	{
 		Query: `SELECT * FROM foo.othertable`,
 		Expected: []sql.Row{
 			{"a", int32(4)},

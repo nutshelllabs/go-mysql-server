@@ -880,10 +880,10 @@ func (b *Builder) buildComparison(inScope *scope, c *ast.ComparisonExpr) sql.Exp
 			b.handleErr(err)
 		}
 	case ast.LikeStr:
-		return expression.NewLike(left, right, escape)
+		return expression.NewLikeWithPattern(left, right, escape, c.LikePattern)
 	case ast.NotLikeStr:
 		b.qFlags.Set(sql.QFlgNotExpr)
-		return expression.NewNot(expression.NewLike(left, right, escape))
+		return expression.NewNot(expression.NewLikeWithPattern(left, right, escape, c.LikePattern))
 	default:
 		err := sql.ErrUnsupportedFeature.New(c.Operator)
 		b.handleErr(err)
