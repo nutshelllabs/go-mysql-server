@@ -479,18 +479,10 @@ func convertSemiToInnerJoin(m *memo.Memo) error {
 				return fmt.Errorf("table for column not found: %d", colId)
 			}
 
-			sch := srcNode.Schema()
-			var table sql.Table
-			if tw, ok := srcNode.(sql.TableNode); ok {
-				table = tw.UnderlyingTable()
+			col, err := sourceColumn(srcNode, colId)
+			if err != nil {
+				return err
 			}
-			if pkt, ok := table.(sql.PrimaryKeyTable); ok {
-				sch = pkt.PrimaryKeySchema().Schema
-			}
-
-			firstCol, _ := srcNode.Columns().Next(1)
-			idx := int(colId - firstCol)
-			col := sch[idx]
 
 			projections = append(projections, expression.NewGetFieldWithTable(int(colId), int(srcNode.Id()), col.Type, col.DatabaseSource, col.Source, col.Name, col.Nullable))
 
@@ -505,6 +497,39 @@ func convertSemiToInnerJoin(m *memo.Memo) error {
 
 		return nil
 	})
+}
+
+// sourceColumn returns the schema column that |colId| denotes on |srcNode|,
+// whose column id set must contain |colId|.
+//
+// Column ids are assigned against a table's FULL schema, so the id's ordinal
+// is resolved against the full schema even when the node has since been
+// projected down to a subset of its columns (sql.ProjectedTable). For a
+// table node that full schema is obtained from sql.PrimaryKeyTable, the same
+// way the memo's relProps does; a TableAlias is unwrapped to its child first,
+// since the alias reports only the projected schema and is not itself a
+// sql.TableNode. A node whose schema cannot be reconciled with the id is an
+// error rather than a panic.
+func sourceColumn(srcNode plan.TableIdNode, colId sql.ColumnId) (*sql.Column, error) {
+	sch := srcNode.Schema()
+	var table sql.Table
+	var node sql.Node = srcNode
+	if ta, ok := node.(*plan.TableAlias); ok {
+		node = ta.Child
+	}
+	if tw, ok := node.(sql.TableNode); ok {
+		table = tw.UnderlyingTable()
+	}
+	if pkt, ok := table.(sql.PrimaryKeyTable); ok {
+		sch = pkt.PrimaryKeySchema().Schema
+	}
+
+	firstCol, _ := srcNode.Columns().Next(1)
+	idx := int(colId - firstCol)
+	if idx < 0 || idx >= len(sch) {
+		return nil, fmt.Errorf("column id %d is out of range for table node %s (%d columns)", colId, srcNode.Name(), len(sch))
+	}
+	return sch[idx], nil
 }
 
 // convertAntiToLeftJoin adds left join alternatives for anti join
@@ -576,22 +601,10 @@ func convertAntiToLeftJoin(m *memo.Memo) error {
 				break
 			}
 
-			sch := srcNode.Schema()
-			var table sql.Table
-			var node sql.Node = srcNode
-			if ta, ok := node.(*plan.TableAlias); ok {
-				node = ta.Child
+			col, err := sourceColumn(srcNode, colId)
+			if err != nil {
+				return err
 			}
-			if tw, ok := node.(sql.TableNode); ok {
-				table = tw.UnderlyingTable()
-			}
-			if pkt, ok := table.(sql.PrimaryKeyTable); ok {
-				sch = pkt.PrimaryKeySchema().Schema
-			}
-
-			firstCol, _ := srcNode.Columns().Next(1)
-			idx := int(colId - firstCol)
-			col := sch[idx]
 
 			projections = append(projections, expression.NewGetFieldWithTable(int(colId), int(srcNode.Id()), col.Type, col.DatabaseSource, col.Source, col.Name, col.Nullable))
 		}

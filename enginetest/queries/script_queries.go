@@ -116,6 +116,34 @@ type ScriptTestAssertion struct {
 // the tests.
 var ScriptTests = []ScriptTest{
 	{
+		// The table on the outer side of the semi join is aliased and, because
+		// the statement is a view (or derived table) body, column-pruned by the
+		// time optimizeJoins runs. convertSemiToInnerJoin must resolve the
+		// projected columns against the FULL schema, as convertAntiToLeftJoin
+		// already does; indexing the alias's projected schema by a full-schema
+		// ordinal panicked with "index out of range".
+		Name: "semi join over an aliased, projected table inside a view body",
+		SetUpScript: []string{
+			"CREATE TABLE seven (c0 INT PRIMARY KEY, c1 INT, c2 INT, c3 INT, c4 INT, c5 INT, c6 INT);",
+			"INSERT INTO seven VALUES (1, 1, 1, 1, 1, 10, 100), (2, 2, 2, 2, 2, 20, 200), (3, 9, 3, 3, 3, 30, 300);",
+			"CREATE VIEW seven_in AS SELECT a.c5 FROM seven a WHERE a.c1 IN (SELECT c1 FROM seven WHERE c0 < 3);",
+		},
+		Assertions: []ScriptTestAssertion{
+			{
+				Query:    "SELECT * FROM seven_in ORDER BY 1;",
+				Expected: []sql.Row{{10}, {20}},
+			},
+			{
+				Query:    "SELECT * FROM (SELECT a.c5, a.c6 FROM seven a WHERE a.c1 IN (SELECT c1 FROM seven)) d ORDER BY 1;",
+				Expected: []sql.Row{{10, 100}, {20, 200}, {30, 300}},
+			},
+			{
+				Query:    "SELECT * FROM (SELECT a.c6 FROM seven a WHERE a.c1 NOT IN (SELECT c1 FROM seven WHERE c0 < 3)) d ORDER BY 1;",
+				Expected: []sql.Row{{300}},
+			},
+		},
+	},
+	{
 		Name: "outer join finish unmatched right side",
 		SetUpScript: []string{
 			`
