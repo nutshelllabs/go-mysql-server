@@ -404,7 +404,7 @@ offset 1;`,
 			"     │   └─ Project\n" +
 			"     │       ├─ columns: [xy_1.x:0!null]\n" +
 			"     │       └─ Project\n" +
-			"     │           ├─ columns: [xy_1.x:0!null, xy_1.y:1]\n" +
+			"     │           ├─ columns: [xy.x:0!null, xy.y:1]\n" +
 			"     │           └─ MergeJoin\n" +
 			"     │               ├─ cmp: Eq\n" +
 			"     │               │   ├─ xy_1.x:0!null\n" +
@@ -446,7 +446,7 @@ offset 1;`,
 			"     │   └─ Project\n" +
 			"     │       ├─ columns: [xy_1.x]\n" +
 			"     │       └─ Project\n" +
-			"     │           ├─ columns: [xy_1.x, xy_1.y]\n" +
+			"     │           ├─ columns: [xy.x, xy.y]\n" +
 			"     │           └─ MergeJoin (estimated cost=2030.000 rows=1000)\n" +
 			"     │               ├─ cmp: (xy_1.x = xy_2.y)\n" +
 			"     │               ├─ TableAlias(xy_1)\n" +
@@ -471,7 +471,7 @@ offset 1;`,
 			"     │   └─ Project\n" +
 			"     │       ├─ columns: [xy_1.x]\n" +
 			"     │       └─ Project\n" +
-			"     │           ├─ columns: [xy_1.x, xy_1.y]\n" +
+			"     │           ├─ columns: [xy.x, xy.y]\n" +
 			"     │           └─ MergeJoin (estimated cost=2030.000 rows=1000) (actual rows=4 loops=1)\n" +
 			"     │               ├─ cmp: (xy_1.x = xy_2.y)\n" +
 			"     │               ├─ TableAlias(xy_1)\n" +
@@ -6205,7 +6205,7 @@ inner join pq on true
 		ExpectedPlan: "Project\n" +
 			" ├─ columns: [a.i:0!null]\n" +
 			" └─ Project\n" +
-			"     ├─ columns: [a.i:0!null, a.s:1!null]\n" +
+			"     ├─ columns: [mytable.i:0!null, mytable.s:1!null]\n" +
 			"     └─ MergeJoin\n" +
 			"         ├─ cmp: Eq\n" +
 			"         │   ├─ a.i:0!null\n" +
@@ -6232,7 +6232,7 @@ inner join pq on true
 		ExpectedEstimates: "Project\n" +
 			" ├─ columns: [a.i]\n" +
 			" └─ Project\n" +
-			"     ├─ columns: [a.i, a.s]\n" +
+			"     ├─ columns: [mytable.i, mytable.s]\n" +
 			"     └─ MergeJoin (estimated cost=6.090 rows=3)\n" +
 			"         ├─ cmp: (a.i = b.i)\n" +
 			"         ├─ TableAlias(a)\n" +
@@ -6248,7 +6248,7 @@ inner join pq on true
 		ExpectedAnalysis: "Project\n" +
 			" ├─ columns: [a.i]\n" +
 			" └─ Project\n" +
-			"     ├─ columns: [a.i, a.s]\n" +
+			"     ├─ columns: [mytable.i, mytable.s]\n" +
 			"     └─ MergeJoin (estimated cost=6.090 rows=3) (actual rows=3 loops=1)\n" +
 			"         ├─ cmp: (a.i = b.i)\n" +
 			"         ├─ TableAlias(a)\n" +
@@ -25530,6 +25530,135 @@ order by x, y;
 			"         └─ Table\n" +
 			"             ├─ name: two_pk\n" +
 			"             └─ columns: [pk2]\n" +
+			"",
+	},
+	{
+		Query: `select pk from (select pk, c1, c2 from one_pk) sq group by pk having sum(c1) > 0`,
+		ExpectedPlan: "Project\n" +
+			" ├─ columns: [sq.pk:1!null]\n" +
+			" └─ Having\n" +
+			"     ├─ GreaterThan\n" +
+			"     │   ├─ sum(sq.c1):0!null\n" +
+			"     │   └─ 0 (tinyint)\n" +
+			"     └─ GroupBy\n" +
+			"         ├─ select: SUM(sq.c1:1), sq.pk:0!null, sq.c1:1\n" +
+			"         ├─ group: sq.pk:0!null\n" +
+			"         └─ SubqueryAlias\n" +
+			"             ├─ name: sq\n" +
+			"             ├─ outerVisibility: false\n" +
+			"             ├─ isLateral: false\n" +
+			"             ├─ cacheable: true\n" +
+			"             ├─ colSet: (7-9)\n" +
+			"             ├─ tableId: 2\n" +
+			"             └─ Table\n" +
+			"                 ├─ name: one_pk\n" +
+			"                 ├─ columns: [pk c1 c2]\n" +
+			"                 ├─ colSet: (1-6)\n" +
+			"                 └─ tableId: 1\n" +
+			"",
+		ExpectedEstimates: "Project\n" +
+			" ├─ columns: [sq.pk]\n" +
+			" └─ Having((sum(sq.c1) > 0))\n" +
+			"     └─ GroupBy\n" +
+			"         ├─ SelectedExprs(SUM(sq.c1), sq.pk, sq.c1)\n" +
+			"         ├─ Grouping(sq.pk)\n" +
+			"         └─ SubqueryAlias\n" +
+			"             ├─ name: sq\n" +
+			"             ├─ outerVisibility: false\n" +
+			"             ├─ isLateral: false\n" +
+			"             ├─ cacheable: true\n" +
+			"             └─ Table\n" +
+			"                 ├─ name: one_pk\n" +
+			"                 └─ columns: [pk c1 c2]\n" +
+			"",
+		ExpectedAnalysis: "Project\n" +
+			" ├─ columns: [sq.pk]\n" +
+			" └─ Having((sum(sq.c1) > 0))\n" +
+			"     └─ GroupBy\n" +
+			"         ├─ SelectedExprs(SUM(sq.c1), sq.pk, sq.c1)\n" +
+			"         ├─ Grouping(sq.pk)\n" +
+			"         └─ SubqueryAlias\n" +
+			"             ├─ name: sq\n" +
+			"             ├─ outerVisibility: false\n" +
+			"             ├─ isLateral: false\n" +
+			"             ├─ cacheable: true\n" +
+			"             └─ Table\n" +
+			"                 ├─ name: one_pk\n" +
+			"                 └─ columns: [pk c1 c2]\n" +
+			"",
+	},
+	{
+		Query: `select pk from one_pk group by pk having sum(c1) > 0`,
+		ExpectedPlan: "Project\n" +
+			" ├─ columns: [one_pk.pk:1!null]\n" +
+			" └─ Having\n" +
+			"     ├─ GreaterThan\n" +
+			"     │   ├─ sum(one_pk.c1):0!null\n" +
+			"     │   └─ 0 (tinyint)\n" +
+			"     └─ GroupBy\n" +
+			"         ├─ select: SUM(one_pk.c1:1), one_pk.pk:0!null, one_pk.c1:1\n" +
+			"         ├─ group: one_pk.pk:0!null\n" +
+			"         └─ ProcessTable\n" +
+			"             └─ Table\n" +
+			"                 ├─ name: one_pk\n" +
+			"                 └─ columns: [pk c1]\n" +
+			"",
+		ExpectedEstimates: "Project\n" +
+			" ├─ columns: [one_pk.pk]\n" +
+			" └─ Having((sum(one_pk.c1) > 0))\n" +
+			"     └─ GroupBy\n" +
+			"         ├─ SelectedExprs(SUM(one_pk.c1), one_pk.pk, one_pk.c1)\n" +
+			"         ├─ Grouping(one_pk.pk)\n" +
+			"         └─ Table\n" +
+			"             ├─ name: one_pk\n" +
+			"             └─ columns: [pk c1]\n" +
+			"",
+		ExpectedAnalysis: "Project\n" +
+			" ├─ columns: [one_pk.pk]\n" +
+			" └─ Having((sum(one_pk.c1) > 0))\n" +
+			"     └─ GroupBy\n" +
+			"         ├─ SelectedExprs(SUM(one_pk.c1), one_pk.pk, one_pk.c1)\n" +
+			"         ├─ Grouping(one_pk.pk)\n" +
+			"         └─ Table\n" +
+			"             ├─ name: one_pk\n" +
+			"             └─ columns: [pk c1]\n" +
+			"",
+	},
+	{
+		Query: `select count(pk) from one_pk having sum(c1) > 0`,
+		ExpectedPlan: "Project\n" +
+			" ├─ columns: [count(one_pk.pk):0!null->count(pk):0]\n" +
+			" └─ Having\n" +
+			"     ├─ GreaterThan\n" +
+			"     │   ├─ sum(one_pk.c1):1!null\n" +
+			"     │   └─ 0 (tinyint)\n" +
+			"     └─ GroupBy\n" +
+			"         ├─ select: COUNT(one_pk.pk:0!null), SUM(one_pk.c1:1), one_pk.c1:1\n" +
+			"         ├─ group: \n" +
+			"         └─ ProcessTable\n" +
+			"             └─ Table\n" +
+			"                 ├─ name: one_pk\n" +
+			"                 └─ columns: [pk c1]\n" +
+			"",
+		ExpectedEstimates: "Project\n" +
+			" ├─ columns: [count(one_pk.pk) as count(pk)]\n" +
+			" └─ Having((sum(one_pk.c1) > 0))\n" +
+			"     └─ GroupBy\n" +
+			"         ├─ SelectedExprs(COUNT(one_pk.pk), SUM(one_pk.c1), one_pk.c1)\n" +
+			"         ├─ Grouping()\n" +
+			"         └─ Table\n" +
+			"             ├─ name: one_pk\n" +
+			"             └─ columns: [pk c1]\n" +
+			"",
+		ExpectedAnalysis: "Project\n" +
+			" ├─ columns: [count(one_pk.pk) as count(pk)]\n" +
+			" └─ Having((sum(one_pk.c1) > 0))\n" +
+			"     └─ GroupBy\n" +
+			"         ├─ SelectedExprs(COUNT(one_pk.pk), SUM(one_pk.c1), one_pk.c1)\n" +
+			"         ├─ Grouping()\n" +
+			"         └─ Table\n" +
+			"             ├─ name: one_pk\n" +
+			"             └─ columns: [pk c1]\n" +
 			"",
 	},
 }
