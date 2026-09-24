@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"time"
 
 	"github.com/cespare/xxhash/v2"
 	"github.com/shopspring/decimal"
@@ -385,25 +386,44 @@ func (b *bitXorBuffer) Dispose() {
 	expression.Dispose(b.expr)
 }
 
+// countDistinctBuffer counts the distinct non-NULL value tuples of its
+// expressions within one group. A buffer is created per group and updated
+// from a single goroutine, so its scratch state needs no locking.
 type countDistinctBuffer struct {
-	seen  map[uint64]struct{}
+	// seen holds the hash of every distinct value tuple observed so far.
+	seen map[uint64]struct{}
+	// exprs are the COUNT(DISTINCT ...) arguments (or a single Star).
 	exprs []sql.Expression
+	// digest is reused (Reset per row) to hash each value tuple.
+	digest *xxhash.Digest
+	// buf is reused scratch space for converting each value to text.
+	buf []byte
+	// vals is reused to hold the evaluated expressions of the current row
+	// (non-Star path only).
+	vals sql.Row
 }
 
+// comma is the separator written after each value when hashing a tuple.
+var comma = []byte{','}
+
 func NewCountDistinctBuffer(children []sql.Expression) *countDistinctBuffer {
-	return &countDistinctBuffer{make(map[uint64]struct{}), children}
+	return &countDistinctBuffer{
+		seen:   make(map[uint64]struct{}),
+		exprs:  children,
+		digest: xxhash.New(),
+		vals:   make(sql.Row, len(children)),
+	}
 }
 
 // Update implements the AggregationBuffer interface.
 func (c *countDistinctBuffer) Update(ctx *sql.Context, row sql.Row) error {
-	var value interface{}
+	var value sql.Row
 	if len(c.exprs) == 0 {
 		return fmt.Errorf("no expressions")
 	}
 	if _, ok := c.exprs[0].(*expression.Star); ok {
 		value = row
 	} else {
-		val := make(sql.Row, len(c.exprs))
 		for i, expr := range c.exprs {
 			v, err := expr.Eval(ctx, row)
 			if err != nil {
@@ -413,37 +433,70 @@ func (c *countDistinctBuffer) Update(ctx *sql.Context, row sql.Row) error {
 			if v == nil {
 				return nil
 			}
-			val[i] = v
+			c.vals[i] = v
 		}
-		value = val
+		value = c.vals
 	}
 
-	var str string
-	for _, val := range value.(sql.Row) {
-		// skip nil values
-		if val == nil {
-			return nil
-		}
-		v, _, err := types.Text.Convert(ctx, val)
-		if err != nil {
-			return err
-		}
-		vv, ok := v.(string)
-		if !ok {
-			return fmt.Errorf("count distinct unable to hash value: %s", err)
-		}
-		str += vv + ","
-	}
-
-	hash := xxhash.New()
-	_, err := hash.WriteString(str)
-	if err != nil {
+	h, ok, err := c.hashRow(ctx, value)
+	if err != nil || !ok {
 		return err
 	}
-	h := hash.Sum64()
 	c.seen[h] = struct{}{}
 
 	return nil
+}
+
+// hashRow hashes the text form of each value followed by a comma, which is
+// the same byte stream as concatenating types.Text.Convert(v) + "," for every
+// value. It reports false (and no hash) when any value is nil, in which case
+// the row is skipped.
+//
+// types.Text.Convert is ConvertToBytes(ctx, v, types.Text, nil) followed by a
+// string conversion, so the bytes, the length limit and the invalid-UTF-8
+// error are the same. The one difference: Text.Convert returns a Text-sized
+// sql.StringWrapper unchanged, which the previous string-concatenating
+// implementation then rejected with "count distinct unable to hash value";
+// ConvertToBytes unwraps it, so such values are now hashed by their contents.
+func (c *countDistinctBuffer) hashRow(ctx *sql.Context, vals sql.Row) (uint64, bool, error) {
+	c.digest.Reset()
+	for _, v := range vals {
+		// skip nil values
+		if v == nil {
+			return 0, false, nil
+		}
+		b, err := types.ConvertToBytes(ctx, v, types.Text, c.buf[:0])
+		if err != nil {
+			return 0, false, err
+		}
+		if ownsConvertedBytes(v) && cap(b) > cap(c.buf) {
+			// b was appended to c.buf and grew it; keep the larger backing
+			// array so the growth is reused. An invalid NullDecimal yields a
+			// nil b, which must not replace the scratch space.
+			c.buf = b
+		}
+		if _, err := c.digest.Write(b); err != nil {
+			return 0, false, err
+		}
+		if _, err := c.digest.Write(comma); err != nil {
+			return 0, false, err
+		}
+	}
+	return c.digest.Sum64(), true, nil
+}
+
+// ownsConvertedBytes reports whether types.ConvertToBytes appends v's text
+// form to its dest argument. For other kinds (e.g. []byte, JSON, byte
+// wrappers, geometry) it can return a slice owned by the value itself, which
+// must not be retained as scratch space and written into.
+func ownsConvertedBytes(v interface{}) bool {
+	switch v.(type) {
+	case string, bool, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64,
+		float32, float64, time.Time, decimal.Decimal, decimal.NullDecimal:
+		return true
+	default:
+		return false
+	}
 }
 
 // Eval implements the AggregationBuffer interface.
