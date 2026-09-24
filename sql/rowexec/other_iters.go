@@ -208,6 +208,11 @@ func (i *cachedResultsIter) Close(ctx *sql.Context) error {
 	return i.iter.Close(ctx)
 }
 
+// hashLookupGeneratingIter passes every build row through while filling the lookup map, and publishes the map
+// only at EOF. It is now used ONLY for exclude-nulls join types: with a NULL key on the build side the join closes
+// the secondary at the first NULL comparison, so the map is never finished and every probe walks the whole build
+// side. That walk is what makes NOT IN exact, because the miss branch in buildHashLookup answers a missed key with
+// an arbitrary non-empty bucket.
 type hashLookupGeneratingIter struct {
 	n         *plan.HashLookup
 	childIter sql.RowIter
@@ -249,6 +254,32 @@ func (h *hashLookupGeneratingIter) Close(c *sql.Context) error {
 }
 
 var _ sql.RowIter = (*hashLookupGeneratingIter)(nil)
+
+// buildHashLookupMap drains child to EOF, bucketing every row under n.GetHashKey of n.RightEntryKey (a NULL key is
+// stored under the nil bucket), and closes child before returning. On a Next or key error the partial map is
+// discarded and the error returned; a Close error is returned as well. The caller owns setting n.Lookup.
+func buildHashLookupMap(ctx *sql.Context, n *plan.HashLookup, child sql.RowIter) (lookup *map[interface{}][]sql.Row, err error) {
+	defer func() {
+		if cerr := child.Close(ctx); cerr != nil && err == nil {
+			lookup, err = nil, cerr
+		}
+	}()
+	m := make(map[interface{}][]sql.Row)
+	for {
+		childRow, err := child.Next(ctx)
+		if err == io.EOF {
+			return &m, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		key, err := n.GetHashKey(ctx, n.RightEntryKey, childRow)
+		if err != nil {
+			return nil, err
+		}
+		m[key] = append(m[key], childRow)
+	}
+}
 
 // declareCursorIter is the sql.RowIter of *DeclareCursor.
 type declareCursorIter struct {

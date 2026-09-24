@@ -946,6 +946,59 @@ where u in (select * from rec);`,
 		},
 	},
 	{
+		// The build side (uv) has duplicate, missing and NULL keys; the ON clause is the key equality only, so a
+		// first probe paired with the whole build side would only be filtered by that equality.
+		name: "hash join answers the first probe from its bucket",
+		setup: []string{
+			"CREATE table xy (x int primary key, y int);",
+			"CREATE table uv (u int, v int);",
+			"insert into xy values (1,10), (2,20), (3,30), (4,40);",
+			"insert into uv values (1,100), (2,200), (2,201), (3,300), (3,301), (5,500), (NULL,600);",
+		},
+		tests: []JoinPlanTest{
+			{
+				q:     "select /*+ HASH_JOIN(xy,uv) */ x, y, u, v from xy join uv on x = u order by x, v",
+				types: []plan.JoinType{plan.JoinTypeHash},
+				exp: []sql.Row{
+					{1, 10, 1, 100},
+					{2, 20, 2, 200},
+					{2, 20, 2, 201},
+					{3, 30, 3, 300},
+					{3, 30, 3, 301},
+				},
+			},
+			{
+				q:     "select /*+ HASH_JOIN(xy,uv) */ x, y, u, v from xy left join uv on x = u order by x, v",
+				types: []plan.JoinType{plan.JoinTypeLeftOuterHash},
+				exp: []sql.Row{
+					{1, 10, 1, 100},
+					{2, 20, 2, 200},
+					{2, 20, 2, 201},
+					{3, 30, 3, 300},
+					{3, 30, 3, 301},
+					{4, 40, nil, nil},
+				},
+			},
+			{
+				// The planner rewrites the semi join to Distinct(uv.u) HashJoin HashLookup(xy).
+				q:     "select /*+ HASH_JOIN(xy,uv) */ x from xy where x in (select u from uv) order by x",
+				types: []plan.JoinType{plan.JoinTypeHash},
+				exp:   []sql.Row{{1}, {2}, {3}},
+			},
+			{
+				// uv holds a NULL u, so NOT IN is NULL (not TRUE) for every xy row that misses.
+				q:     "select /*+ HASH_JOIN(xy,uv) */ x from xy where x not in (select u from uv) order by x",
+				types: []plan.JoinType{plan.JoinTypeLeftOuterHashExcludeNulls},
+				exp:   []sql.Row{},
+			},
+			{
+				q:     "select /*+ HASH_JOIN(xy,uv) */ x from xy where x not in (select u from uv where u is not null) order by x",
+				types: []plan.JoinType{plan.JoinTypeLeftOuterHashExcludeNulls},
+				exp:   []sql.Row{{4}},
+			},
+		},
+	},
+	{
 		name: "join varchar and text columns",
 		setup: []string{
 			"CREATE table varchartable (pk int primary key, s varchar(20));",

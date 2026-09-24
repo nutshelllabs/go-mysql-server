@@ -222,7 +222,19 @@ func (b *BaseBuilder) buildHashLookup(ctx *sql.Context, n *plan.HashLookup, row 
 		if err != nil {
 			return nil, err
 		}
-		return newHashLookupGeneratingIter(n, childIter), nil
+		if n.JoinType.IsExcludeNulls() {
+			// NOT IN is exact only while every probe walks the whole build side: a NULL build key makes the join
+			// close the secondary early, the map is never finished, and the miss branch below would otherwise
+			// answer a missed key with an arbitrary bucket. Keep the pass-through path for these join types.
+			return newHashLookupGeneratingIter(n, childIter), nil
+		}
+		// Build the whole map before answering, so the first probe is served from its bucket like every later
+		// probe. The mutex stays held for the build: a concurrent prober waits for the finished map.
+		lookup, err := buildHashLookupMap(ctx, n, childIter)
+		if err != nil {
+			return nil, err
+		}
+		n.Lookup = lookup
 	}
 	key, err := n.GetHashKey(ctx, n.LeftProbeKey, row)
 	if err != nil {
