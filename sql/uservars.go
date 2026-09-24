@@ -50,8 +50,8 @@ func (u *UserVars) SetUserVariable(ctx *Context, varName string, value interface
 
 // GetUserVariable implements the Session interface.
 func (u *UserVars) GetUserVariable(ctx *Context, varName string) (Type, interface{}, error) {
-	u.mu.Lock()
-	defer u.mu.Unlock()
+	u.mu.RLock()
+	defer u.mu.RUnlock()
 	val, ok := u.userVars[strings.ToLower(varName)]
 	if !ok {
 		return nil, nil, nil
