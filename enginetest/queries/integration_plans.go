@@ -16283,7 +16283,7 @@ ORDER BY cla.FTQLQ ASC`,
 			"     └─ Project\n" +
 			"         ├─ columns: [cla.FTQLQ:1!null]\n" +
 			"         └─ Project\n" +
-			"             ├─ columns: [cla.id:1!null, cla.FTQLQ:2!null, cla.TUXML:3, cla.PAEF5:4, cla.RUCY4:5, cla.TPNJ6:6!null, cla.LBL53:7, cla.NB3QS:8, cla.EO7IV:9, cla.MUHJF:10, cla.FM34L:11, cla.TY5RF:12, cla.ZHTLH:13, cla.NPB7W:14, cla.SX3HH:15, cla.ISBNF:16, cla.YA7YB:17, cla.C5YKB:18, cla.QK7KT:19, cla.FFGE6:20, cla.FIIGJ:21, cla.SH3NC:22, cla.NTENA:23, cla.M4AUB:24, cla.X5AIR:25, cla.SAB6M:26, cla.G5QI5:27, cla.ZVQVD:28, cla.YKSSU:29, cla.FHCYT:30]\n" +
+			"             ├─ columns: [YK2GW.id:1!null, YK2GW.FTQLQ:2!null, YK2GW.TUXML:3, YK2GW.PAEF5:4, YK2GW.RUCY4:5, YK2GW.TPNJ6:6!null, YK2GW.LBL53:7, YK2GW.NB3QS:8, YK2GW.EO7IV:9, YK2GW.MUHJF:10, YK2GW.FM34L:11, YK2GW.TY5RF:12, YK2GW.ZHTLH:13, YK2GW.NPB7W:14, YK2GW.SX3HH:15, YK2GW.ISBNF:16, YK2GW.YA7YB:17, YK2GW.C5YKB:18, YK2GW.QK7KT:19, YK2GW.FFGE6:20, YK2GW.FIIGJ:21, YK2GW.SH3NC:22, YK2GW.NTENA:23, YK2GW.M4AUB:24, YK2GW.X5AIR:25, YK2GW.SAB6M:26, YK2GW.G5QI5:27, YK2GW.ZVQVD:28, YK2GW.YKSSU:29, YK2GW.FHCYT:30]\n" +
 			"             └─ HashJoin\n" +
 			"                 ├─ Eq\n" +
 			"                 │   ├─ cla.id:1!null\n" +
@@ -16293,7 +16293,7 @@ ORDER BY cla.FTQLQ ASC`,
 			"                 │       ├─ columns: [bs.IXUXU:2]\n" +
 			"                 │       └─ SemiLookupJoin\n" +
 			"                 │           ├─ Project\n" +
-			"                 │           │   ├─ columns: [bs.id:0!null, bs.NFRYN:1!null, bs.IXUXU:2, bs.FHCYT:3]\n" +
+			"                 │           │   ├─ columns: [THNTS.id:0!null, THNTS.NFRYN:1!null, THNTS.IXUXU:2, THNTS.FHCYT:3]\n" +
 			"                 │           │   └─ MergeJoin\n" +
 			"                 │           │       ├─ cmp: Eq\n" +
 			"                 │           │       │   ├─ bs.id:0!null\n" +
@@ -16341,7 +16341,7 @@ ORDER BY cla.FTQLQ ASC`,
 			"     └─ Project\n" +
 			"         ├─ columns: [cla.FTQLQ]\n" +
 			"         └─ Project\n" +
-			"             ├─ columns: [cla.id, cla.FTQLQ, cla.TUXML, cla.PAEF5, cla.RUCY4, cla.TPNJ6, cla.LBL53, cla.NB3QS, cla.EO7IV, cla.MUHJF, cla.FM34L, cla.TY5RF, cla.ZHTLH, cla.NPB7W, cla.SX3HH, cla.ISBNF, cla.YA7YB, cla.C5YKB, cla.QK7KT, cla.FFGE6, cla.FIIGJ, cla.SH3NC, cla.NTENA, cla.M4AUB, cla.X5AIR, cla.SAB6M, cla.G5QI5, cla.ZVQVD, cla.YKSSU, cla.FHCYT]\n" +
+			"             ├─ columns: [YK2GW.id, YK2GW.FTQLQ, YK2GW.TUXML, YK2GW.PAEF5, YK2GW.RUCY4, YK2GW.TPNJ6, YK2GW.LBL53, YK2GW.NB3QS, YK2GW.EO7IV, YK2GW.MUHJF, YK2GW.FM34L, YK2GW.TY5RF, YK2GW.ZHTLH, YK2GW.NPB7W, YK2GW.SX3HH, YK2GW.ISBNF, YK2GW.YA7YB, YK2GW.C5YKB, YK2GW.QK7KT, YK2GW.FFGE6, YK2GW.FIIGJ, YK2GW.SH3NC, YK2GW.NTENA, YK2GW.M4AUB, YK2GW.X5AIR, YK2GW.SAB6M, YK2GW.G5QI5, YK2GW.ZVQVD, YK2GW.YKSSU, YK2GW.FHCYT]\n" +
 			"             └─ HashJoin\n" +
 			"                 ├─ (cla.id = bs.IXUXU)\n" +
 			"                 ├─ Distinct\n" +
@@ -16349,7 +16349,7 @@ ORDER BY cla.FTQLQ ASC`,
 			"                 │       ├─ columns: [bs.IXUXU]\n" +
 			"                 │       └─ SemiLookupJoin\n" +
 			"                 │           ├─ Project\n" +
-			"                 │           │   ├─ columns: [bs.id, bs.NFRYN, bs.IXUXU, bs.FHCYT]\n" +
+			"                 │           │   ├─ columns: [THNTS.id, THNTS.NFRYN, THNTS.IXUXU, THNTS.FHCYT]\n" +
 			"                 │           │   └─ MergeJoin\n" +
 			"                 │           │       ├─ cmp: (bs.id = hgmq6.GXLUB)\n" +
 			"                 │           │       ├─ TableAlias(bs)\n" +
@@ -16378,7 +16378,7 @@ ORDER BY cla.FTQLQ ASC`,
 			"     └─ Project\n" +
 			"         ├─ columns: [cla.FTQLQ]\n" +
 			"         └─ Project\n" +
-			"             ├─ columns: [cla.id, cla.FTQLQ, cla.TUXML, cla.PAEF5, cla.RUCY4, cla.TPNJ6, cla.LBL53, cla.NB3QS, cla.EO7IV, cla.MUHJF, cla.FM34L, cla.TY5RF, cla.ZHTLH, cla.NPB7W, cla.SX3HH, cla.ISBNF, cla.YA7YB, cla.C5YKB, cla.QK7KT, cla.FFGE6, cla.FIIGJ, cla.SH3NC, cla.NTENA, cla.M4AUB, cla.X5AIR, cla.SAB6M, cla.G5QI5, cla.ZVQVD, cla.YKSSU, cla.FHCYT]\n" +
+			"             ├─ columns: [YK2GW.id, YK2GW.FTQLQ, YK2GW.TUXML, YK2GW.PAEF5, YK2GW.RUCY4, YK2GW.TPNJ6, YK2GW.LBL53, YK2GW.NB3QS, YK2GW.EO7IV, YK2GW.MUHJF, YK2GW.FM34L, YK2GW.TY5RF, YK2GW.ZHTLH, YK2GW.NPB7W, YK2GW.SX3HH, YK2GW.ISBNF, YK2GW.YA7YB, YK2GW.C5YKB, YK2GW.QK7KT, YK2GW.FFGE6, YK2GW.FIIGJ, YK2GW.SH3NC, YK2GW.NTENA, YK2GW.M4AUB, YK2GW.X5AIR, YK2GW.SAB6M, YK2GW.G5QI5, YK2GW.ZVQVD, YK2GW.YKSSU, YK2GW.FHCYT]\n" +
 			"             └─ HashJoin\n" +
 			"                 ├─ (cla.id = bs.IXUXU)\n" +
 			"                 ├─ Distinct\n" +
@@ -16386,7 +16386,7 @@ ORDER BY cla.FTQLQ ASC`,
 			"                 │       ├─ columns: [bs.IXUXU]\n" +
 			"                 │       └─ SemiLookupJoin\n" +
 			"                 │           ├─ Project\n" +
-			"                 │           │   ├─ columns: [bs.id, bs.NFRYN, bs.IXUXU, bs.FHCYT]\n" +
+			"                 │           │   ├─ columns: [THNTS.id, THNTS.NFRYN, THNTS.IXUXU, THNTS.FHCYT]\n" +
 			"                 │           │   └─ MergeJoin\n" +
 			"                 │           │       ├─ cmp: (bs.id = hgmq6.GXLUB)\n" +
 			"                 │           │       ├─ TableAlias(bs)\n" +
@@ -16527,7 +16527,7 @@ ORDER BY cla.FTQLQ ASC`,
 			"     └─ Project\n" +
 			"         ├─ columns: [cla.FTQLQ:1!null]\n" +
 			"         └─ Project\n" +
-			"             ├─ columns: [cla.id:1!null, cla.FTQLQ:2!null, cla.TUXML:3, cla.PAEF5:4, cla.RUCY4:5, cla.TPNJ6:6!null, cla.LBL53:7, cla.NB3QS:8, cla.EO7IV:9, cla.MUHJF:10, cla.FM34L:11, cla.TY5RF:12, cla.ZHTLH:13, cla.NPB7W:14, cla.SX3HH:15, cla.ISBNF:16, cla.YA7YB:17, cla.C5YKB:18, cla.QK7KT:19, cla.FFGE6:20, cla.FIIGJ:21, cla.SH3NC:22, cla.NTENA:23, cla.M4AUB:24, cla.X5AIR:25, cla.SAB6M:26, cla.G5QI5:27, cla.ZVQVD:28, cla.YKSSU:29, cla.FHCYT:30]\n" +
+			"             ├─ columns: [YK2GW.id:1!null, YK2GW.FTQLQ:2!null, YK2GW.TUXML:3, YK2GW.PAEF5:4, YK2GW.RUCY4:5, YK2GW.TPNJ6:6!null, YK2GW.LBL53:7, YK2GW.NB3QS:8, YK2GW.EO7IV:9, YK2GW.MUHJF:10, YK2GW.FM34L:11, YK2GW.TY5RF:12, YK2GW.ZHTLH:13, YK2GW.NPB7W:14, YK2GW.SX3HH:15, YK2GW.ISBNF:16, YK2GW.YA7YB:17, YK2GW.C5YKB:18, YK2GW.QK7KT:19, YK2GW.FFGE6:20, YK2GW.FIIGJ:21, YK2GW.SH3NC:22, YK2GW.NTENA:23, YK2GW.M4AUB:24, YK2GW.X5AIR:25, YK2GW.SAB6M:26, YK2GW.G5QI5:27, YK2GW.ZVQVD:28, YK2GW.YKSSU:29, YK2GW.FHCYT:30]\n" +
 			"             └─ HashJoin\n" +
 			"                 ├─ Eq\n" +
 			"                 │   ├─ cla.id:1!null\n" +
@@ -16536,7 +16536,7 @@ ORDER BY cla.FTQLQ ASC`,
 			"                 │   └─ Project\n" +
 			"                 │       ├─ columns: [bs.IXUXU:2]\n" +
 			"                 │       └─ Project\n" +
-			"                 │           ├─ columns: [bs.id:0!null, bs.NFRYN:1!null, bs.IXUXU:2, bs.FHCYT:3]\n" +
+			"                 │           ├─ columns: [THNTS.id:0!null, THNTS.NFRYN:1!null, THNTS.IXUXU:2, THNTS.FHCYT:3]\n" +
 			"                 │           └─ MergeJoin\n" +
 			"                 │               ├─ cmp: Eq\n" +
 			"                 │               │   ├─ bs.id:0!null\n" +
@@ -16574,14 +16574,14 @@ ORDER BY cla.FTQLQ ASC`,
 			"     └─ Project\n" +
 			"         ├─ columns: [cla.FTQLQ]\n" +
 			"         └─ Project\n" +
-			"             ├─ columns: [cla.id, cla.FTQLQ, cla.TUXML, cla.PAEF5, cla.RUCY4, cla.TPNJ6, cla.LBL53, cla.NB3QS, cla.EO7IV, cla.MUHJF, cla.FM34L, cla.TY5RF, cla.ZHTLH, cla.NPB7W, cla.SX3HH, cla.ISBNF, cla.YA7YB, cla.C5YKB, cla.QK7KT, cla.FFGE6, cla.FIIGJ, cla.SH3NC, cla.NTENA, cla.M4AUB, cla.X5AIR, cla.SAB6M, cla.G5QI5, cla.ZVQVD, cla.YKSSU, cla.FHCYT]\n" +
+			"             ├─ columns: [YK2GW.id, YK2GW.FTQLQ, YK2GW.TUXML, YK2GW.PAEF5, YK2GW.RUCY4, YK2GW.TPNJ6, YK2GW.LBL53, YK2GW.NB3QS, YK2GW.EO7IV, YK2GW.MUHJF, YK2GW.FM34L, YK2GW.TY5RF, YK2GW.ZHTLH, YK2GW.NPB7W, YK2GW.SX3HH, YK2GW.ISBNF, YK2GW.YA7YB, YK2GW.C5YKB, YK2GW.QK7KT, YK2GW.FFGE6, YK2GW.FIIGJ, YK2GW.SH3NC, YK2GW.NTENA, YK2GW.M4AUB, YK2GW.X5AIR, YK2GW.SAB6M, YK2GW.G5QI5, YK2GW.ZVQVD, YK2GW.YKSSU, YK2GW.FHCYT]\n" +
 			"             └─ HashJoin\n" +
 			"                 ├─ (cla.id = bs.IXUXU)\n" +
 			"                 ├─ Distinct\n" +
 			"                 │   └─ Project\n" +
 			"                 │       ├─ columns: [bs.IXUXU]\n" +
 			"                 │       └─ Project\n" +
-			"                 │           ├─ columns: [bs.id, bs.NFRYN, bs.IXUXU, bs.FHCYT]\n" +
+			"                 │           ├─ columns: [THNTS.id, THNTS.NFRYN, THNTS.IXUXU, THNTS.FHCYT]\n" +
 			"                 │           └─ MergeJoin\n" +
 			"                 │               ├─ cmp: (bs.id = amyxq.GXLUB)\n" +
 			"                 │               ├─ TableAlias(bs)\n" +
@@ -16605,14 +16605,14 @@ ORDER BY cla.FTQLQ ASC`,
 			"     └─ Project\n" +
 			"         ├─ columns: [cla.FTQLQ]\n" +
 			"         └─ Project\n" +
-			"             ├─ columns: [cla.id, cla.FTQLQ, cla.TUXML, cla.PAEF5, cla.RUCY4, cla.TPNJ6, cla.LBL53, cla.NB3QS, cla.EO7IV, cla.MUHJF, cla.FM34L, cla.TY5RF, cla.ZHTLH, cla.NPB7W, cla.SX3HH, cla.ISBNF, cla.YA7YB, cla.C5YKB, cla.QK7KT, cla.FFGE6, cla.FIIGJ, cla.SH3NC, cla.NTENA, cla.M4AUB, cla.X5AIR, cla.SAB6M, cla.G5QI5, cla.ZVQVD, cla.YKSSU, cla.FHCYT]\n" +
+			"             ├─ columns: [YK2GW.id, YK2GW.FTQLQ, YK2GW.TUXML, YK2GW.PAEF5, YK2GW.RUCY4, YK2GW.TPNJ6, YK2GW.LBL53, YK2GW.NB3QS, YK2GW.EO7IV, YK2GW.MUHJF, YK2GW.FM34L, YK2GW.TY5RF, YK2GW.ZHTLH, YK2GW.NPB7W, YK2GW.SX3HH, YK2GW.ISBNF, YK2GW.YA7YB, YK2GW.C5YKB, YK2GW.QK7KT, YK2GW.FFGE6, YK2GW.FIIGJ, YK2GW.SH3NC, YK2GW.NTENA, YK2GW.M4AUB, YK2GW.X5AIR, YK2GW.SAB6M, YK2GW.G5QI5, YK2GW.ZVQVD, YK2GW.YKSSU, YK2GW.FHCYT]\n" +
 			"             └─ HashJoin\n" +
 			"                 ├─ (cla.id = bs.IXUXU)\n" +
 			"                 ├─ Distinct\n" +
 			"                 │   └─ Project\n" +
 			"                 │       ├─ columns: [bs.IXUXU]\n" +
 			"                 │       └─ Project\n" +
-			"                 │           ├─ columns: [bs.id, bs.NFRYN, bs.IXUXU, bs.FHCYT]\n" +
+			"                 │           ├─ columns: [THNTS.id, THNTS.NFRYN, THNTS.IXUXU, THNTS.FHCYT]\n" +
 			"                 │           └─ MergeJoin\n" +
 			"                 │               ├─ cmp: (bs.id = amyxq.GXLUB)\n" +
 			"                 │               ├─ TableAlias(bs)\n" +
