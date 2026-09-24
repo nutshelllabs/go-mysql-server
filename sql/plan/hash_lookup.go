@@ -37,9 +37,18 @@ func NewHashLookup(n sql.Node, rightEntryKey sql.Expression, leftProbeKey sql.Ex
 		UnaryNode:     UnaryNode{n},
 		RightEntryKey: rightEntryKey,
 		LeftProbeKey:  leftProbeKey,
+		probeKeyType:  resolvedType(leftProbeKey),
 		Mutex:         new(sync.Mutex),
 		JoinType:      joinType,
 	}
+}
+
+// resolvedType returns e.Type() when e is non-nil and resolved, and nil otherwise.
+func resolvedType(e sql.Expression) sql.Type {
+	if e == nil || !e.Resolved() {
+		return nil
+	}
+	return e.Type()
 }
 
 type HashLookup struct {
@@ -49,6 +58,9 @@ type HashLookup struct {
 	Mutex         *sync.Mutex
 	Lookup        *map[interface{}][]sql.Row
 	JoinType      JoinType
+	// probeKeyType caches LeftProbeKey.Type(), which allocates per call for a multi-column Tuple key. It is set by
+	// NewHashLookup and WithExpressions; nil means "not cached, call LeftProbeKey.Type()".
+	probeKeyType sql.Type
 }
 
 var _ sql.Node = (*HashLookup)(nil)
@@ -70,6 +82,7 @@ func (n *HashLookup) WithExpressions(exprs ...sql.Expression) (sql.Node, error) 
 	ret := *n
 	ret.RightEntryKey = exprs[0]
 	ret.LeftProbeKey = exprs[1]
+	ret.probeKeyType = resolvedType(exprs[1])
 	return &ret, nil
 }
 
@@ -118,7 +131,11 @@ func (n *HashLookup) GetHashKey(ctx *sql.Context, e sql.Expression, row sql.Row)
 	if err != nil {
 		return nil, err
 	}
-	key, _, err = n.LeftProbeKey.Type().Convert(ctx, key)
+	t := n.probeKeyType
+	if t == nil {
+		t = n.LeftProbeKey.Type()
+	}
+	key, _, err = t.Convert(ctx, key)
 	if types.ErrValueNotNil.Is(err) {
 		// The LHS expression was NullType. This is allowed.
 		return nil, nil
