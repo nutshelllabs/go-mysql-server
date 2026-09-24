@@ -144,6 +144,44 @@ var ScriptTests = []ScriptTest{
 		},
 	},
 	{
+		// IN (subquery) must hash the probe and the build side through one type, the one `=` compares them with;
+		// DATE() declares DATE but yields a string, and a CAST probe used to be rendered through the subquery's
+		// text type in DATETIME layout. A bare IN is decorrelated into a semi join, so each query adds
+		// "or i = -1" to keep the InSubquery evaluator.
+		Name: "InSubquery hashes both sides through one type",
+		SetUpScript: []string{
+			"create table d (i int primary key, t text, dt date);",
+			"insert into d values (1, '2026-09-11', '2026-09-11'), (2, '2026-09-12', '2026-09-12'), (3, '2026-09-13', '2026-09-13'), (4, '2026-09-14', '2026-09-14'), (5, '2026-09-15', '2026-09-15');",
+			"delete from d where i = 3;",
+		},
+		Assertions: []ScriptTestAssertion{
+			{
+				Query:    "select i from d a where exists (select 1 from d b where b.dt = a.t) order by i;",
+				Expected: []sql.Row{{1}, {2}, {4}, {5}},
+			},
+			{
+				Query:    "select i from d where t in (select dt from d) or i = -1 order by i;",
+				Expected: []sql.Row{{1}, {2}, {4}, {5}},
+			},
+			{
+				Query:    "select i from d where cast(t as date) in (select t from d) or i = -1 order by i;",
+				Expected: []sql.Row{{1}, {2}, {4}, {5}},
+			},
+			{
+				Query:    "select i from d where t in (select date(dt) from d) or i = -1 order by i;",
+				Expected: []sql.Row{{1}, {2}, {4}, {5}},
+			},
+			{
+				Query:    "select i from d where date(dt) in (select t from d) or i = -1 order by i;",
+				Expected: []sql.Row{{1}, {2}, {4}, {5}},
+			},
+			{
+				Query:    "select i from d where cast(t as date) not in (select t from d where i <> 4) or i = -1 order by i;",
+				Expected: []sql.Row{{4}},
+			},
+		},
+	},
+	{
 		Name: "outer join finish unmatched right side",
 		SetUpScript: []string{
 			`

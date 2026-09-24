@@ -75,9 +75,15 @@ func (in *InSubquery) Eval(ctx *sql.Context, row sql.Row) (interface{}, error) {
 			return nil, sql.ErrInvalidOperandColumns.New(types.NumColumns(typ), types.NumColumns(right.Type()))
 		}
 
-		typ := right.Type()
+		// Both sides are hashed through one key type, the type `=` would compare them with; the tuple path keeps
+		// today's raw build side and converts the probe through the subquery's type.
+		hashType := inSubqueryHashType(typ, right.Type())
+		typ := hashType
+		if typ == nil {
+			typ = right.Type()
+		}
 
-		values, err := right.HashMultiple(ctx, row)
+		values, err := right.HashMultipleWithType(ctx, row, hashType)
 		if err != nil {
 			return nil, err
 		}
@@ -90,7 +96,7 @@ func (in *InSubquery) Eval(ctx *sql.Context, row sql.Row) (interface{}, error) {
 			return nil, nil
 		}
 
-		// convert left to right's type
+		// convert left to the key type
 		nLeft, _, err := typ.Convert(ctx, left)
 		if err != nil {
 			return false, nil
@@ -114,7 +120,7 @@ func (in *InSubquery) Eval(ctx *sql.Context, row sql.Row) (interface{}, error) {
 			return false, nil
 		}
 
-		cmp, err := typ.Compare(ctx, left, val)
+		cmp, err := typ.Compare(ctx, nLeft, val)
 		if err != nil {
 			return nil, err
 		}
@@ -123,6 +129,23 @@ func (in *InSubquery) Eval(ctx *sql.Context, row sql.Row) (interface{}, error) {
 
 	default:
 		return nil, expression.ErrUnsupportedInOperand.New(right)
+	}
+}
+
+// inSubqueryHashType returns the type both sides of an IN (subquery) are converted through before they are hashed,
+// mirroring the type `=` compares them with: nil when either side is a tuple (the tuple path hashes the build side
+// raw), right when the types are equal, DATETIME(6) when either side is temporal, and otherwise right. left is the
+// promoted type of the left operand and right is the subquery's type.
+func inSubqueryHashType(left, right sql.Type) sql.Type {
+	switch {
+	case types.IsTuple(left) || types.IsTuple(right):
+		return nil
+	case types.TypesEqual(left, right):
+		return right
+	case types.IsTime(left) || types.IsTime(right):
+		return types.DatetimeMaxPrecision
+	default:
+		return right
 	}
 }
 

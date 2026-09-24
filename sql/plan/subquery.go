@@ -43,6 +43,9 @@ type Subquery struct {
 	cache []interface{}
 	// Cached hash results, if any
 	hashCache sql.KeyValueCache
+	// hashCacheType is the key type hashCache was built with (see HashMultipleWithType); nil means the values were
+	// hashed raw.
+	hashCacheType sql.Type
 	// Dispose function for the cache, if any. This would appear to violate the rule that nodes must be comparable by
 	// reflect.DeepEquals, but it's safe in practice because the function is always nil until execution.
 	disposeFunc sql.DisposeFunc
@@ -389,36 +392,67 @@ func (s *Subquery) evalMultiple(ctx *sql.Context, row sql.Row) ([]interface{}, e
 }
 
 // HashMultiple returns all rows returned by a subquery, backed by a sql.KeyValueCache. Keys are constructed using the
-// 64-bit hash of the values stored.
+// 64-bit hash of the values stored. Values are hashed raw; see HashMultipleWithType.
 func (s *Subquery) HashMultiple(ctx *sql.Context, row sql.Row) (sql.KeyValueCache, error) {
+	return s.HashMultipleWithType(ctx, row, nil)
+}
+
+// HashMultipleWithType is HashMultiple with every non-NULL value converted through keyType before it is stored and
+// hashed, so that a probe converted through the same type finds it. A value that fails to convert is stored raw. A
+// nil keyType hashes the values raw. A cached hash map is reused only when it was built with the same key type;
+// otherwise it is rebuilt from the cached results.
+func (s *Subquery) HashMultipleWithType(ctx *sql.Context, row sql.Row, keyType sql.Type) (sql.KeyValueCache, error) {
 	s.cacheMu.Lock()
-	cached := s.resultsCached && s.hashCache != nil
+	cached := s.resultsCached && s.hashCache != nil && hashKeyTypesMatch(s.hashCacheType, keyType)
 	s.cacheMu.Unlock()
 	if cached {
 		return s.hashCache, nil
 	}
 
-	result, err := s.evalMultiple(ctx, row)
-	if err != nil {
-		return nil, err
+	s.cacheMu.Lock()
+	result, resultsCached := s.cache, s.resultsCached
+	s.cacheMu.Unlock()
+	if !resultsCached {
+		var err error
+		result, err = s.evalMultiple(ctx, row)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if s.canCacheResults() {
 		s.cacheMu.Lock()
 		defer s.cacheMu.Unlock()
-		if !s.resultsCached || s.hashCache == nil {
+		if !s.resultsCached || s.hashCache == nil || !hashKeyTypesMatch(s.hashCacheType, keyType) {
+			if s.resultsCached {
+				result = s.cache
+			}
+			if s.disposeFunc != nil {
+				s.disposeFunc()
+				s.disposeFunc = nil
+			}
+			s.hashCache = nil
 			hashCache, disposeFn := ctx.Memory.NewHistoryCache()
-			err = putAllRows(ctx, hashCache, result)
-			if err != nil {
+			if err := putAllRows(ctx, hashCache, result, keyType); err != nil {
+				disposeFn()
 				return nil, err
 			}
-			s.cache, s.hashCache, s.disposeFunc, s.resultsCached = result, hashCache, disposeFn, true
+			s.cache, s.hashCache, s.hashCacheType, s.disposeFunc, s.resultsCached = result, hashCache, keyType, disposeFn, true
 		}
 		return s.hashCache, nil
 	}
 
 	cache := sql.NewMapCache()
-	return cache, putAllRows(ctx, cache, result)
+	return cache, putAllRows(ctx, cache, result, keyType)
+}
+
+// hashKeyTypesMatch reports whether a hash map built with key type built can serve a request for key type want: both
+// nil, or equal types.
+func hashKeyTypesMatch(built, want sql.Type) bool {
+	if built == nil || want == nil {
+		return built == nil && want == nil
+	}
+	return types.TypesEqual(built, want)
 }
 
 // HasResultRow returns whether the subquery has a result set > 0.
@@ -472,11 +506,18 @@ func normalizeForKeyValueCache(ctx *sql.Context, val interface{}) (interface{}, 
 	return sql.UnwrapAny(ctx, val)
 }
 
-func putAllRows(ctx *sql.Context, cache sql.KeyValueCache, vals []interface{}) error {
+// putAllRows normalizes each value, converts every non-NULL one through keyType when keyType is not nil (keeping the
+// raw value when the conversion fails, so it matches nothing), and stores it in cache under the hash of the result.
+func putAllRows(ctx *sql.Context, cache sql.KeyValueCache, vals []interface{}, keyType sql.Type) error {
 	for _, val := range vals {
 		val, err := normalizeForKeyValueCache(ctx, val)
 		if err != nil {
 			return err
+		}
+		if keyType != nil && val != nil {
+			if converted, _, convErr := keyType.Convert(ctx, val); convErr == nil {
+				val = converted
+			}
 		}
 		rowKey, err := sql.HashOf(ctx, sql.NewRow(val))
 		if err != nil {
