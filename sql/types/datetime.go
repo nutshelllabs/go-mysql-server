@@ -337,7 +337,32 @@ func (t datetimeType) ConvertWithoutRangeCheck(ctx context.Context, v interface{
 	return res, nil
 }
 
+// shortDateLayouts is the ordered set of date-only layouts tried first by
+// parseDatetime for inputs of at most 10 bytes. Short inputs are almost always
+// plain dates, and every datetime layout in TimestampDatetimeLayouts needs at
+// least 13 bytes (a date, a space or 'T', an hour and a minute) while the
+// date-only layouts only match 8 to 10 bytes, so the two sets are disjoint by
+// length and trying these first cannot change the result. "2006-01-02" comes
+// first because it is the common case; it matches a strict subset of
+// "2006-1-2" and yields the same instant. The exported DateOnlyLayouts and
+// TimestampDatetimeLayouts are left untouched because other code iterates them.
+var shortDateLayouts = []string{
+	"2006-01-02",
+	"20060102",
+	"2006-1-2",
+	"2006/01/02",
+}
+
+// parseDatetime parses value against the supported datetime layouts and
+// returns the result in UTC, or false if no layout matches.
 func parseDatetime(value string) (time.Time, bool) {
+	if len(value) <= 10 {
+		for _, layout := range shortDateLayouts {
+			if t, err := time.Parse(layout, value); err == nil {
+				return t.UTC(), true
+			}
+		}
+	}
 	for _, fmt := range TimestampDatetimeLayouts {
 		if t, err := time.Parse(fmt, value); err == nil {
 			return t.UTC(), true

@@ -16,6 +16,7 @@ package types
 
 import (
 	"fmt"
+	"math/rand"
 	"reflect"
 	"testing"
 	"time"
@@ -404,4 +405,199 @@ func TestDatetimeZero(t *testing.T) {
 	require.True(t, ok)
 	_, ok = MustCreateDatetimeType(sqltypes.Timestamp, 0).Zero().(time.Time)
 	require.True(t, ok)
+}
+
+// parseDatetimeReference is a verbatim copy of the original parseDatetime loop,
+// used as the oracle for the date-only-first fast path.
+func parseDatetimeReference(value string) (time.Time, bool) {
+	for _, fmt := range TimestampDatetimeLayouts {
+		if t, err := time.Parse(fmt, value); err == nil {
+			return t.UTC(), true
+		}
+	}
+	return time.Time{}, false
+}
+
+// parseDatetimeSeeds covers every date-only and datetime layout, inputs that
+// must not parse, and the 10/11-byte boundary.
+var parseDatetimeSeeds = []string{
+	// date-only layouts
+	"2026-09-11", "20260911", "2026-9-1", "2026/09/11", "2026-9-11", "2026-09-1",
+	// short non-dates
+	"2026-13-45", "", "abc", "2026-09-1x", "12:34:56", "2026/9/1", "0000-00-00",
+	// every datetime layout
+	"2026-09-11T10:04:05Z",
+	"2026-09-11T10:04:05+02:00",
+	"2026-09-11T10:04:05.123456789Z",
+	"2026-09-11 15:4",
+	"2026-09-11 15:04",
+	"2026-09-11 15:04:",
+	"2026-09-11 15:04:.",
+	"2026-09-11 15:04:05.",
+	"2026-09-11 10:04:05",
+	"2026-09-11 10:04:05.123456",
+	"2026-9-1 1:4:5.123",
+	"2026-09-11T10:04:05",
+	"20260911100405",
+	"2026-09-11 10:04:05.123456789 +0200 CEST",
+	"2026-09-11 10:04:05 +0000 UTC",
+	// boundary lengths (10 vs 11 bytes)
+	"2026-09-11 ", " 2026-09-11", "2026-09-110", "202609111", "2026/09/111",
+}
+
+// assertParseEquivalent fails t if parseDatetime and parseDatetimeReference
+// disagree on value, and reports whether value parsed.
+func assertParseEquivalent(t testing.TB, value string) bool {
+	got, gotOK := parseDatetime(value)
+	want, wantOK := parseDatetimeReference(value)
+	if gotOK != wantOK || !got.Equal(want) || got.Location() != want.Location() {
+		t.Fatalf("parseDatetime(%q) = (%v, %v), reference = (%v, %v)", value, got, gotOK, want, wantOK)
+	}
+	if gotOK && got.Location() != time.UTC {
+		t.Fatalf("parseDatetime(%q) location = %v, want UTC", value, got.Location())
+	}
+	return gotOK
+}
+
+func TestParseDatetimeDateOnlyFirst(t *testing.T) {
+	for _, v := range parseDatetimeSeeds {
+		t.Run(fmt.Sprintf("%q", v), func(t *testing.T) {
+			assertParseEquivalent(t, v)
+		})
+	}
+
+	sep11 := time.Date(2026, 9, 11, 0, 0, 0, 0, time.UTC)
+	explicit := []struct {
+		in   string
+		ok   bool
+		want time.Time
+	}{
+		{"2026-09-11", true, sep11},
+		{"20260911", true, sep11},
+		{"2026-9-1", true, time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)},
+		{"2026/09/11", true, sep11},
+		{"2026-13-45", false, time.Time{}},
+		{"", false, time.Time{}},
+		{"abc", false, time.Time{}},
+		{"2026-09-1x", false, time.Time{}},
+		{"12:34:56", false, time.Time{}},
+		{"2026-09-11 ", false, time.Time{}},
+		{"2026-09-11 10:04:05", true, time.Date(2026, 9, 11, 10, 4, 5, 0, time.UTC)},
+	}
+	for _, tt := range explicit {
+		got, ok := parseDatetime(tt.in)
+		require.Equal(t, tt.ok, ok, "input %q", tt.in)
+		if tt.ok {
+			require.True(t, got.Equal(tt.want), "input %q: got %v want %v", tt.in, got, tt.want)
+			require.Equal(t, time.UTC, got.Location(), "input %q", tt.in)
+		}
+	}
+}
+
+func TestParseDatetimeEquivalence(t *testing.T) {
+	const alphabet = "0123456789-/:T .Z+MSTabc"
+	const iterations = 200000
+	rng := rand.New(rand.NewSource(20260911))
+
+	// validSamples holds one valid string per layout, used as mutation seeds.
+	ref := time.Date(2026, 9, 11, 10, 4, 5, 123456789, time.UTC)
+	var validSamples []string
+	for _, layout := range TimestampDatetimeLayouts {
+		validSamples = append(validSamples, ref.Format(layout))
+	}
+	validSamples = append(validSamples, parseDatetimeSeeds...)
+
+	pad := func(n, width int) string {
+		if rng.Intn(2) == 0 {
+			return fmt.Sprintf("%0*d", width, n)
+		}
+		return fmt.Sprintf("%d", n)
+	}
+	seps := []string{"-", "/", "", ".", " ", ":"}
+
+	parsed := 0
+	for i := 0; i < iterations; i++ {
+		var s string
+		switch i % 3 {
+		case 0: // random ASCII
+			b := make([]byte, rng.Intn(25))
+			for j := range b {
+				b[j] = alphabet[rng.Intn(len(alphabet))]
+			}
+			s = string(b)
+		case 1: // mutated seed
+			b := []byte(validSamples[rng.Intn(len(validSamples))])
+			c := alphabet[rng.Intn(len(alphabet))]
+			switch op := rng.Intn(3); {
+			case op == 0 && len(b) > 0:
+				b[rng.Intn(len(b))] = c
+			case op == 1:
+				p := rng.Intn(len(b) + 1)
+				b = append(b[:p], append([]byte{c}, b[p:]...)...)
+			case len(b) > 0:
+				p := rng.Intn(len(b))
+				b = append(b[:p], b[p+1:]...)
+			}
+			s = string(b)
+		default: // date-shaped
+			sep := seps[rng.Intn(len(seps))]
+			s = pad(rng.Intn(10000), 4) + sep + pad(rng.Intn(14), 2) + sep + pad(rng.Intn(33), 2)
+			if rng.Intn(3) == 0 {
+				ts := []string{" ", "T"}[rng.Intn(2)]
+				s += ts + pad(rng.Intn(25), 2) + ":" + pad(rng.Intn(61), 2)
+				if rng.Intn(2) == 0 {
+					s += ":" + pad(rng.Intn(61), 2)
+				}
+				if rng.Intn(3) == 0 {
+					s += "." + pad(rng.Intn(1000000), 6)
+				}
+				if rng.Intn(4) == 0 {
+					s += "Z"
+				}
+			}
+		}
+		if assertParseEquivalent(t, s) {
+			parsed++
+		}
+	}
+	t.Logf("equivalence: %d inputs, %d parsed, 0 mismatches", iterations, parsed)
+	require.Greater(t, parsed, 0)
+}
+
+func FuzzParseDatetime(f *testing.F) {
+	for _, v := range parseDatetimeSeeds {
+		f.Add(v)
+	}
+	f.Fuzz(func(t *testing.T, value string) {
+		assertParseEquivalent(t, value)
+	})
+}
+
+func BenchmarkParseDatetimeDateOnly(b *testing.B) {
+	for _, v := range []string{"2026-09-11", "20260911"} {
+		b.Run(v, func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				parseDatetime(v)
+			}
+		})
+	}
+}
+
+func BenchmarkParseDatetimeReferenceDateOnly(b *testing.B) {
+	for _, v := range []string{"2026-09-11", "20260911"} {
+		b.Run(v, func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				parseDatetimeReference(v)
+			}
+		})
+	}
+}
+
+func BenchmarkParseDatetimeDatetime(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		parseDatetime("2026-09-11 10:04:05")
+	}
 }
