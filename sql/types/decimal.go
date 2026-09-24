@@ -48,18 +48,47 @@ var (
 
 type DecimalType_ struct {
 	exclusiveUpperBound decimal.Decimal
-	definesColumn       bool
-	precision           uint8
-	scale               uint8
+	// upperAtScale is exclusiveUpperBound rescaled to exponent -scale, so BoundsCheck can compare values that are
+	// already at the column's scale without rescaling (and so without allocating).
+	upperAtScale decimal.Decimal
+	// lowerAtScale is the negation of upperAtScale (the exclusive lower bound at exponent -scale).
+	lowerAtScale decimal.Decimal
+	// boundsAtScaleReady reports whether upperAtScale and lowerAtScale were computed; a zero-value DecimalType_ leaves
+	// it false and BoundsCheck then keeps the general path.
+	boundsAtScaleReady bool
+	definesColumn      bool
+	precision          uint8
+	scale              uint8
 }
 
 // InternalDecimalType is a special DecimalType that is used internally for Decimal comparisons. Not intended for usage
 // from integrators.
-var InternalDecimalType sql.DecimalType = DecimalType_{
-	exclusiveUpperBound: decimal.New(1, int32(65)),
-	definesColumn:       false,
-	precision:           65,
-	scale:               30,
+var InternalDecimalType sql.DecimalType = newInternalDecimalType()
+
+// newInternalDecimalType builds the value of InternalDecimalType: DECIMAL(65,30) with an exclusive upper bound of 10^65.
+func newInternalDecimalType() DecimalType_ {
+	return DecimalType_{
+		exclusiveUpperBound: decimal.New(1, int32(65)),
+		definesColumn:       false,
+		precision:           65,
+		scale:               30,
+	}.withBoundsAtScale()
+}
+
+// withBoundsAtScale returns t with upperAtScale and lowerAtScale set to ±exclusiveUpperBound rescaled to exponent
+// -scale. It panics if exclusiveUpperBound cannot be represented exactly at that exponent, which no constructible
+// type allows.
+func (t DecimalType_) withBoundsAtScale() DecimalType_ {
+	shift := int64(t.exclusiveUpperBound.Exponent()) + int64(t.scale)
+	if shift < 0 {
+		panic(fmt.Sprintf("decimal bound %s is not representable at scale %d", t.exclusiveUpperBound.String(), t.scale))
+	}
+	coef := new(big.Int).Exp(big.NewInt(10), big.NewInt(shift), nil)
+	coef.Mul(coef, t.exclusiveUpperBound.Coefficient())
+	t.upperAtScale = decimal.NewFromBigInt(coef, -int32(t.scale))
+	t.lowerAtScale = t.upperAtScale.Neg()
+	t.boundsAtScaleReady = true
+	return t
 }
 
 // CreateDecimalType creates a DecimalType for NON-TABLE-COLUMN.
@@ -94,7 +123,7 @@ func createDecimalType(precision uint8, scale uint8, definesColumn bool) (sql.De
 		definesColumn:       definesColumn,
 		precision:           precision,
 		scale:               scale,
-	}, nil
+	}.withBoundsAtScale(), nil
 }
 
 // MustCreateDecimalType is the same as CreateDecimalType except it panics on errors and for NON-TABLE-COLUMN.
@@ -254,6 +283,14 @@ func (t DecimalType_) ConvertToNullDecimal(v interface{}) (decimal.NullDecimal, 
 }
 
 func (t DecimalType_) BoundsCheck(v decimal.Decimal) (decimal.Decimal, sql.ConvertInRange, error) {
+	if t.boundsAtScaleReady && v.Exponent() == -int32(t.scale) {
+		// Fast path: v is already at the type's scale, so no rounding applies and comparing against the precomputed
+		// bounds at the same exponent needs no rescaling. Equivalent to !v.Abs().LessThan(t.exclusiveUpperBound).
+		if v.Cmp(t.upperAtScale) >= 0 || v.Cmp(t.lowerAtScale) <= 0 {
+			return decimal.Decimal{}, sql.InRange, ErrConvertToDecimalLimit.New()
+		}
+		return v, sql.InRange, nil
+	}
 	if -v.Exponent() > int32(t.scale) {
 		// TODO : add 'Data truncated' warning
 		v = v.Round(int32(t.scale))

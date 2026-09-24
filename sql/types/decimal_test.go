@@ -145,46 +145,46 @@ func TestCreateNonColumnDecimal(t *testing.T) {
 		expectedType DecimalType_
 		expectedErr  bool
 	}{
-		{0, 0, DecimalType_{decimal.New(1, 10), false, 10, 0}, false},
+		{0, 0, DecimalType_{exclusiveUpperBound: decimal.New(1, 10), definesColumn: false, precision: 10, scale: 0}, false},
 		{0, 1, DecimalType_{}, true},
 		{0, 5, DecimalType_{}, true},
 		{0, 10, DecimalType_{}, true},
 		{0, 30, DecimalType_{}, true},
 		{0, 65, DecimalType_{}, true},
 		{0, 66, DecimalType_{}, true},
-		{1, 0, DecimalType_{decimal.New(1, 1), false, 1, 0}, false},
-		{1, 1, DecimalType_{decimal.New(1, 0), false, 1, 1}, false},
+		{1, 0, DecimalType_{exclusiveUpperBound: decimal.New(1, 1), definesColumn: false, precision: 1, scale: 0}, false},
+		{1, 1, DecimalType_{exclusiveUpperBound: decimal.New(1, 0), definesColumn: false, precision: 1, scale: 1}, false},
 		{1, 5, DecimalType_{}, true},
 		{1, 10, DecimalType_{}, true},
 		{1, 30, DecimalType_{}, true},
 		{1, 65, DecimalType_{}, true},
 		{1, 66, DecimalType_{}, true},
-		{5, 0, DecimalType_{decimal.New(1, 5), false, 5, 0}, false},
-		{5, 1, DecimalType_{decimal.New(1, 4), false, 5, 1}, false},
-		{5, 5, DecimalType_{decimal.New(1, 0), false, 5, 5}, false},
+		{5, 0, DecimalType_{exclusiveUpperBound: decimal.New(1, 5), definesColumn: false, precision: 5, scale: 0}, false},
+		{5, 1, DecimalType_{exclusiveUpperBound: decimal.New(1, 4), definesColumn: false, precision: 5, scale: 1}, false},
+		{5, 5, DecimalType_{exclusiveUpperBound: decimal.New(1, 0), definesColumn: false, precision: 5, scale: 5}, false},
 		{5, 10, DecimalType_{}, true},
 		{5, 30, DecimalType_{}, true},
 		{5, 65, DecimalType_{}, true},
 		{5, 66, DecimalType_{}, true},
-		{10, 0, DecimalType_{decimal.New(1, 10), false, 10, 0}, false},
-		{10, 1, DecimalType_{decimal.New(1, 9), false, 10, 1}, false},
-		{10, 5, DecimalType_{decimal.New(1, 5), false, 10, 5}, false},
-		{10, 10, DecimalType_{decimal.New(1, 0), false, 10, 10}, false},
+		{10, 0, DecimalType_{exclusiveUpperBound: decimal.New(1, 10), definesColumn: false, precision: 10, scale: 0}, false},
+		{10, 1, DecimalType_{exclusiveUpperBound: decimal.New(1, 9), definesColumn: false, precision: 10, scale: 1}, false},
+		{10, 5, DecimalType_{exclusiveUpperBound: decimal.New(1, 5), definesColumn: false, precision: 10, scale: 5}, false},
+		{10, 10, DecimalType_{exclusiveUpperBound: decimal.New(1, 0), definesColumn: false, precision: 10, scale: 10}, false},
 		{10, 30, DecimalType_{}, true},
 		{10, 65, DecimalType_{}, true},
 		{10, 66, DecimalType_{}, true},
-		{30, 0, DecimalType_{decimal.New(1, 30), false, 30, 0}, false},
-		{30, 1, DecimalType_{decimal.New(1, 29), false, 30, 1}, false},
-		{30, 5, DecimalType_{decimal.New(1, 25), false, 30, 5}, false},
-		{30, 10, DecimalType_{decimal.New(1, 20), false, 30, 10}, false},
-		{30, 30, DecimalType_{decimal.New(1, 0), false, 30, 30}, false},
+		{30, 0, DecimalType_{exclusiveUpperBound: decimal.New(1, 30), definesColumn: false, precision: 30, scale: 0}, false},
+		{30, 1, DecimalType_{exclusiveUpperBound: decimal.New(1, 29), definesColumn: false, precision: 30, scale: 1}, false},
+		{30, 5, DecimalType_{exclusiveUpperBound: decimal.New(1, 25), definesColumn: false, precision: 30, scale: 5}, false},
+		{30, 10, DecimalType_{exclusiveUpperBound: decimal.New(1, 20), definesColumn: false, precision: 30, scale: 10}, false},
+		{30, 30, DecimalType_{exclusiveUpperBound: decimal.New(1, 0), definesColumn: false, precision: 30, scale: 30}, false},
 		{30, 65, DecimalType_{}, true},
 		{30, 66, DecimalType_{}, true},
-		{65, 0, DecimalType_{decimal.New(1, 65), false, 65, 0}, false},
-		{65, 1, DecimalType_{decimal.New(1, 64), false, 65, 1}, false},
-		{65, 5, DecimalType_{decimal.New(1, 60), false, 65, 5}, false},
-		{65, 10, DecimalType_{decimal.New(1, 55), false, 65, 10}, false},
-		{65, 30, DecimalType_{decimal.New(1, 35), false, 65, 30}, false},
+		{65, 0, DecimalType_{exclusiveUpperBound: decimal.New(1, 65), definesColumn: false, precision: 65, scale: 0}, false},
+		{65, 1, DecimalType_{exclusiveUpperBound: decimal.New(1, 64), definesColumn: false, precision: 65, scale: 1}, false},
+		{65, 5, DecimalType_{exclusiveUpperBound: decimal.New(1, 60), definesColumn: false, precision: 65, scale: 5}, false},
+		{65, 10, DecimalType_{exclusiveUpperBound: decimal.New(1, 55), definesColumn: false, precision: 65, scale: 10}, false},
+		{65, 30, DecimalType_{exclusiveUpperBound: decimal.New(1, 35), definesColumn: false, precision: 65, scale: 30}, false},
 		{65, 65, DecimalType_{}, true},
 		{65, 66, DecimalType_{}, true},
 		{66, 00, DecimalType_{}, true},
@@ -203,7 +203,7 @@ func TestCreateNonColumnDecimal(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, test.expectedType, typ)
+				assert.Equal(t, test.expectedType.withBoundsAtScale(), typ)
 			}
 		})
 	}
@@ -216,46 +216,46 @@ func TestCreateColumnDecimal(t *testing.T) {
 		expectedType DecimalType_
 		expectedErr  bool
 	}{
-		{0, 0, DecimalType_{decimal.New(1, 10), true, 10, 0}, false},
+		{0, 0, DecimalType_{exclusiveUpperBound: decimal.New(1, 10), definesColumn: true, precision: 10, scale: 0}, false},
 		{0, 1, DecimalType_{}, true},
 		{0, 5, DecimalType_{}, true},
 		{0, 10, DecimalType_{}, true},
 		{0, 30, DecimalType_{}, true},
 		{0, 65, DecimalType_{}, true},
 		{0, 66, DecimalType_{}, true},
-		{1, 0, DecimalType_{decimal.New(1, 1), true, 1, 0}, false},
-		{1, 1, DecimalType_{decimal.New(1, 0), true, 1, 1}, false},
+		{1, 0, DecimalType_{exclusiveUpperBound: decimal.New(1, 1), definesColumn: true, precision: 1, scale: 0}, false},
+		{1, 1, DecimalType_{exclusiveUpperBound: decimal.New(1, 0), definesColumn: true, precision: 1, scale: 1}, false},
 		{1, 5, DecimalType_{}, true},
 		{1, 10, DecimalType_{}, true},
 		{1, 30, DecimalType_{}, true},
 		{1, 65, DecimalType_{}, true},
 		{1, 66, DecimalType_{}, true},
-		{5, 0, DecimalType_{decimal.New(1, 5), true, 5, 0}, false},
-		{5, 1, DecimalType_{decimal.New(1, 4), true, 5, 1}, false},
-		{5, 5, DecimalType_{decimal.New(1, 0), true, 5, 5}, false},
+		{5, 0, DecimalType_{exclusiveUpperBound: decimal.New(1, 5), definesColumn: true, precision: 5, scale: 0}, false},
+		{5, 1, DecimalType_{exclusiveUpperBound: decimal.New(1, 4), definesColumn: true, precision: 5, scale: 1}, false},
+		{5, 5, DecimalType_{exclusiveUpperBound: decimal.New(1, 0), definesColumn: true, precision: 5, scale: 5}, false},
 		{5, 10, DecimalType_{}, true},
 		{5, 30, DecimalType_{}, true},
 		{5, 65, DecimalType_{}, true},
 		{5, 66, DecimalType_{}, true},
-		{10, 0, DecimalType_{decimal.New(1, 10), true, 10, 0}, false},
-		{10, 1, DecimalType_{decimal.New(1, 9), true, 10, 1}, false},
-		{10, 5, DecimalType_{decimal.New(1, 5), true, 10, 5}, false},
-		{10, 10, DecimalType_{decimal.New(1, 0), true, 10, 10}, false},
+		{10, 0, DecimalType_{exclusiveUpperBound: decimal.New(1, 10), definesColumn: true, precision: 10, scale: 0}, false},
+		{10, 1, DecimalType_{exclusiveUpperBound: decimal.New(1, 9), definesColumn: true, precision: 10, scale: 1}, false},
+		{10, 5, DecimalType_{exclusiveUpperBound: decimal.New(1, 5), definesColumn: true, precision: 10, scale: 5}, false},
+		{10, 10, DecimalType_{exclusiveUpperBound: decimal.New(1, 0), definesColumn: true, precision: 10, scale: 10}, false},
 		{10, 30, DecimalType_{}, true},
 		{10, 65, DecimalType_{}, true},
 		{10, 66, DecimalType_{}, true},
-		{30, 0, DecimalType_{decimal.New(1, 30), true, 30, 0}, false},
-		{30, 1, DecimalType_{decimal.New(1, 29), true, 30, 1}, false},
-		{30, 5, DecimalType_{decimal.New(1, 25), true, 30, 5}, false},
-		{30, 10, DecimalType_{decimal.New(1, 20), true, 30, 10}, false},
-		{30, 30, DecimalType_{decimal.New(1, 0), true, 30, 30}, false},
+		{30, 0, DecimalType_{exclusiveUpperBound: decimal.New(1, 30), definesColumn: true, precision: 30, scale: 0}, false},
+		{30, 1, DecimalType_{exclusiveUpperBound: decimal.New(1, 29), definesColumn: true, precision: 30, scale: 1}, false},
+		{30, 5, DecimalType_{exclusiveUpperBound: decimal.New(1, 25), definesColumn: true, precision: 30, scale: 5}, false},
+		{30, 10, DecimalType_{exclusiveUpperBound: decimal.New(1, 20), definesColumn: true, precision: 30, scale: 10}, false},
+		{30, 30, DecimalType_{exclusiveUpperBound: decimal.New(1, 0), definesColumn: true, precision: 30, scale: 30}, false},
 		{30, 65, DecimalType_{}, true},
 		{30, 66, DecimalType_{}, true},
-		{65, 0, DecimalType_{decimal.New(1, 65), true, 65, 0}, false},
-		{65, 1, DecimalType_{decimal.New(1, 64), true, 65, 1}, false},
-		{65, 5, DecimalType_{decimal.New(1, 60), true, 65, 5}, false},
-		{65, 10, DecimalType_{decimal.New(1, 55), true, 65, 10}, false},
-		{65, 30, DecimalType_{decimal.New(1, 35), true, 65, 30}, false},
+		{65, 0, DecimalType_{exclusiveUpperBound: decimal.New(1, 65), definesColumn: true, precision: 65, scale: 0}, false},
+		{65, 1, DecimalType_{exclusiveUpperBound: decimal.New(1, 64), definesColumn: true, precision: 65, scale: 1}, false},
+		{65, 5, DecimalType_{exclusiveUpperBound: decimal.New(1, 60), definesColumn: true, precision: 65, scale: 5}, false},
+		{65, 10, DecimalType_{exclusiveUpperBound: decimal.New(1, 55), definesColumn: true, precision: 65, scale: 10}, false},
+		{65, 30, DecimalType_{exclusiveUpperBound: decimal.New(1, 35), definesColumn: true, precision: 65, scale: 30}, false},
 		{65, 65, DecimalType_{}, true},
 		{65, 66, DecimalType_{}, true},
 		{66, 00, DecimalType_{}, true},
@@ -274,7 +274,7 @@ func TestCreateColumnDecimal(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, test.expectedType, typ)
+				assert.Equal(t, test.expectedType.withBoundsAtScale(), typ)
 			}
 		})
 	}
@@ -424,5 +424,131 @@ func TestDecimalZero(t *testing.T) {
 			_, ok := dt.Zero().(decimal.Decimal)
 			assert.True(t, ok)
 		})
+	}
+}
+
+// boundsCheckReference is a verbatim copy of the BoundsCheck body before the at-scale fast path was added. It is the
+// oracle for TestDecimalBoundsCheckFastPath and the "before" side of BenchmarkDecimalBoundsCheckReference.
+func boundsCheckReference(t DecimalType_, v decimal.Decimal) (decimal.Decimal, sql.ConvertInRange, error) {
+	if -v.Exponent() > int32(t.scale) {
+		// TODO : add 'Data truncated' warning
+		v = v.Round(int32(t.scale))
+	}
+	// TODO add shortcut for common case
+	// ex: certain num of bits fast tracks OK
+	if !v.Abs().LessThan(t.exclusiveUpperBound) {
+		return decimal.Decimal{}, sql.InRange, ErrConvertToDecimalLimit.New()
+	}
+	return v, sql.InRange, nil
+}
+
+// TestDecimalBoundsCheckFastPath checks that BoundsCheck gives exactly the result of the pre-fast-path implementation
+// (value, exponent, range flag and error) for values at the type's scale and at other exponents.
+func TestDecimalBoundsCheckFastPath(t *testing.T) {
+	types := []DecimalType_{
+		MustCreateDecimalType(18, 2).(DecimalType_),
+		MustCreateDecimalType(5, 0).(DecimalType_),
+		MustCreateDecimalType(10, 10).(DecimalType_),
+		MustCreateDecimalType(65, 30).(DecimalType_),
+		MustCreateColumnDecimalType(18, 2).(DecimalType_),
+		InternalDecimalType.(DecimalType_),
+		{}, // zero value: bounds never computed, must keep the general path
+	}
+	for _, typ := range types {
+		t.Run(fmt.Sprintf("%d_%d_%v", typ.precision, typ.scale, typ.definesColumn), func(t *testing.T) {
+			exp := -int32(typ.scale)
+			// bound is exclusiveUpperBound expressed at exponent -scale; ulp is one unit at that exponent.
+			bound := new(big.Int).Mul(typ.exclusiveUpperBound.Coefficient(),
+				new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(typ.exclusiveUpperBound.Exponent())-int64(exp)), nil))
+			atScale := func(c *big.Int) decimal.Decimal { return decimal.NewFromBigInt(c, exp) }
+			one := big.NewInt(1)
+			values := []decimal.Decimal{
+				atScale(big.NewInt(0)),
+				atScale(new(big.Int).Sub(bound, one)),
+				atScale(new(big.Int).Neg(new(big.Int).Sub(bound, one))),
+				atScale(new(big.Int).Set(bound)),
+				atScale(new(big.Int).Neg(bound)),
+				atScale(new(big.Int).Add(bound, one)),
+				atScale(new(big.Int).Neg(new(big.Int).Add(bound, one))),
+				atScale(decimal.RequireFromString("-1234.56").Shift(int32(typ.scale)).Truncate(0).BigInt()),
+				// Other exponents: the general (rounding) path must still run.
+				decimal.New(-123456789, exp-1),
+				decimal.New(5, exp-1),
+				decimal.New(-5, exp-1),
+				decimal.NewFromBigInt(new(big.Int).Sub(new(big.Int).Mul(bound, big.NewInt(10)), big.NewInt(5)), exp-1),
+				decimal.New(7, 0),
+				decimal.New(-7, 0),
+				decimal.New(3, 2),
+				decimal.New(-3, 2),
+				decimal.Decimal{},
+			}
+			for _, v := range values {
+				got, gotRange, gotErr := typ.BoundsCheck(v)
+				want, wantRange, wantErr := boundsCheckReference(typ, v)
+				require.Equal(t, wantRange, gotRange, "range for %s (exp %d)", v, v.Exponent())
+				if wantErr != nil {
+					require.True(t, ErrConvertToDecimalLimit.Is(wantErr))
+					require.Error(t, gotErr, "value %s (exp %d)", v, v.Exponent())
+					require.True(t, ErrConvertToDecimalLimit.Is(gotErr), "value %s (exp %d)", v, v.Exponent())
+				} else {
+					require.NoError(t, gotErr, "value %s (exp %d)", v, v.Exponent())
+				}
+				require.True(t, got.Cmp(want) == 0 && got.Exponent() == want.Exponent(),
+					"value %s (exp %d): got %s (exp %d), want %s (exp %d)",
+					v, v.Exponent(), got, got.Exponent(), want, want.Exponent())
+			}
+		})
+	}
+}
+
+// TestDecimalBoundsCheckFastPathAllocs checks that BoundsCheck does not allocate for a value at the column's scale and
+// reports the allocations of the general path and of Convert.
+func TestDecimalBoundsCheckFastPathAllocs(t *testing.T) {
+	typ := MustCreateDecimalType(18, 2).(DecimalType_)
+	atScale := decimal.RequireFromString("-1234.56")
+	offScale := decimal.RequireFromString("1234.5")
+	ctx := context.Background()
+
+	fast := testing.AllocsPerRun(1000, func() { _, _, _ = typ.BoundsCheck(atScale) })
+	require.Equal(t, 0.0, fast, "BoundsCheck at scale must not allocate")
+	slow := testing.AllocsPerRun(1000, func() { _, _, _ = typ.BoundsCheck(offScale) })
+	t.Logf("BoundsCheck allocs: at scale (exp -2) = %v, off scale (exp -1) = %v", fast, slow)
+
+	// Box the argument once so only Convert's own allocations are counted.
+	var boxed interface{} = atScale
+	convert := testing.AllocsPerRun(1000, func() { _, _, _ = typ.Convert(ctx, boxed) })
+	t.Logf("Convert(decimal at scale) allocs = %v", convert)
+	require.LessOrEqual(t, convert, 1.0, "Convert at scale should only box the result")
+}
+
+// BenchmarkDecimalConvertAtScale measures DECIMAL(18,2).Convert on a decimal already at the column's scale (fast
+// path) and on a float64 input.
+func BenchmarkDecimalConvertAtScale(b *testing.B) {
+	typ := MustCreateDecimalType(18, 2)
+	ctx := context.Background()
+	b.Run("decimal", func(b *testing.B) {
+		var v interface{} = decimal.RequireFromString("-1234.56")
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			_, _, _ = typ.Convert(ctx, v)
+		}
+	})
+	b.Run("float64", func(b *testing.B) {
+		var v interface{} = -1234.56
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			_, _, _ = typ.Convert(ctx, v)
+		}
+	})
+}
+
+// BenchmarkDecimalBoundsCheckReference measures the pre-fast-path BoundsCheck on the value used by
+// BenchmarkDecimalConvertAtScale, for a before/after comparison in one run.
+func BenchmarkDecimalBoundsCheckReference(b *testing.B) {
+	typ := MustCreateDecimalType(18, 2).(DecimalType_)
+	v := decimal.RequireFromString("-1234.56")
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, _, _ = boundsCheckReference(typ, v)
 	}
 }
