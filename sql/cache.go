@@ -18,18 +18,27 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"strconv"
 	"sync"
+	"time"
 
 	"github.com/cespare/xxhash/v2"
+	"github.com/shopspring/decimal"
 
 	lru "github.com/hashicorp/golang-lru"
 )
 
 // HashOf returns a hash of the given value to be used as key in a cache.
+//
+// Each cell is hashed as the bytes fmt's "%v," would print for it, with cells
+// separated by a 0 byte. Common scalar types are formatted directly into a
+// stack buffer (byte-for-byte what fmt would produce); every other type goes
+// through fmt itself, so the hash values are unchanged from the fmt-only form.
 func HashOf(ctx context.Context, v Row) (uint64, error) {
 	hash := digestPool.Get().(*xxhash.Digest)
 	hash.Reset()
 	defer digestPool.Put(hash)
+	var scratch [64]byte
 	for i, x := range v {
 		if i > 0 {
 			// separate each value in the row with a nil byte
@@ -41,15 +50,75 @@ func HashOf(ctx context.Context, v Row) (uint64, error) {
 		if err != nil {
 			return 0, err
 		}
-		// TODO: probably much faster to do this with a type switch
 		// TODO: we don't have the type info necessary to appropriately encode the value of a string with a non-standard
 		//  collation, which means that two strings that differ only in their collations will hash to the same value.
 		//  See rowexec/grouping_key()
-		if _, err := fmt.Fprintf(hash, "%v,", x); err != nil {
+		b, ok := appendHashCell(scratch[:0], x)
+		if !ok {
+			if _, err := fmt.Fprintf(hash, "%v,", x); err != nil {
+				return 0, err
+			}
+			continue
+		}
+		if _, err := hash.Write(append(b, ',')); err != nil {
 			return 0, err
 		}
 	}
 	return hash.Sum64(), nil
+}
+
+// hashTimeLayout is the layout time.Time.String uses before any monotonic
+// clock suffix.
+const hashTimeLayout = "2006-01-02 15:04:05.999999999 -0700 MST"
+
+// appendHashCell appends to b exactly the bytes fmt's "%v" verb prints for x,
+// for the scalar types it handles directly. It reports false (and HashOf falls
+// back to fmt) for every other type.
+func appendHashCell(b []byte, x interface{}) ([]byte, bool) {
+	switch x := x.(type) {
+	case nil:
+		return append(b, "<nil>"...), true
+	case string:
+		return append(b, x...), true
+	case int:
+		return strconv.AppendInt(b, int64(x), 10), true
+	case int8:
+		return strconv.AppendInt(b, int64(x), 10), true
+	case int16:
+		return strconv.AppendInt(b, int64(x), 10), true
+	case int32:
+		return strconv.AppendInt(b, int64(x), 10), true
+	case int64:
+		return strconv.AppendInt(b, x, 10), true
+	case uint:
+		return strconv.AppendUint(b, uint64(x), 10), true
+	case uint8:
+		return strconv.AppendUint(b, uint64(x), 10), true
+	case uint16:
+		return strconv.AppendUint(b, uint64(x), 10), true
+	case uint32:
+		return strconv.AppendUint(b, uint64(x), 10), true
+	case uint64:
+		return strconv.AppendUint(b, x, 10), true
+	case float64:
+		return strconv.AppendFloat(b, x, 'g', -1, 64), true
+	case float32:
+		return strconv.AppendFloat(b, float64(x), 'g', -1, 32), true
+	case bool:
+		return strconv.AppendBool(b, x), true
+	case time.Time:
+		// Round(0) strips a monotonic clock reading; String appends one as
+		// " m=..." when present, so only the reading-free case is formatted
+		// here and the other goes through String itself.
+		if x == x.Round(0) {
+			return x.AppendFormat(b, hashTimeLayout), true
+		}
+		return append(b, x.String()...), true
+	case decimal.Decimal:
+		return append(b, x.String()...), true
+	default:
+		return b, false
+	}
 }
 
 var digestPool = sync.Pool{
