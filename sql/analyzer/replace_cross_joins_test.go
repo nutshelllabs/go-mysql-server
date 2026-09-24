@@ -41,6 +41,13 @@ func TestConvertCrossJoin(t *testing.T) {
 		{Name: "z", Type: types.Int64, Source: "b"},
 	}), nil)
 
+	// The aliases are shared between each input plan and its expected plan: the rule memoizes their Schema(), and
+	// that memo state is part of the deep equality the assertion uses, so fresh-but-equal aliases would not compare
+	// equal once the rule has run.
+	aliasB := plan.NewTableAlias("b", plan.NewResolvedTable(tableB, nil, nil))
+	aliasC := plan.NewTableAlias("c", plan.NewResolvedTable(tableB, nil, nil))
+	aliasD := plan.NewTableAlias("d", plan.NewResolvedTable(tableB, nil, nil))
+
 	fieldAx := expression.NewGetFieldWithTable(0, 0, types.Int64, "db", "a", "x", false)
 	fieldBy := expression.NewGetFieldWithTable(0, 0, types.Int64, "db", "b", "y", false)
 	litOne := expression.NewLiteral(1, types.Int64)
@@ -89,12 +96,12 @@ func TestConvertCrossJoin(t *testing.T) {
 				t,
 				plan.NewCrossJoin(
 					plan.NewResolvedTable(tableA, nil, nil),
-					plan.NewTableAlias("b", plan.NewResolvedTable(tableB, nil, nil)),
+					aliasB,
 				),
 			),
 			expected: plan.NewInnerJoin(
 				plan.NewResolvedTable(tableA, nil, nil),
-				plan.NewTableAlias("b", plan.NewResolvedTable(tableB, nil, nil)),
+				aliasB,
 				t,
 			),
 		}
@@ -107,14 +114,14 @@ func TestConvertCrossJoin(t *testing.T) {
 				t,
 				plan.NewCrossJoin(
 					plan.NewResolvedTable(tableA, nil, nil),
-					plan.NewTableAlias("b", plan.NewResolvedTable(tableB, nil, nil)),
+					aliasB,
 				),
 			),
 			expected: plan.NewFilter(
 				t,
 				plan.NewCrossJoin(
 					plan.NewResolvedTable(tableA, nil, nil),
-					plan.NewTableAlias("b", plan.NewResolvedTable(tableB, nil, nil)),
+					aliasB,
 				),
 			),
 		}
@@ -131,14 +138,14 @@ func TestConvertCrossJoin(t *testing.T) {
 				),
 				plan.NewCrossJoin(
 					plan.NewResolvedTable(tableA, nil, nil),
-					plan.NewTableAlias("b", plan.NewResolvedTable(tableB, nil, nil)),
+					aliasB,
 				),
 			),
 			expected: plan.NewFilter(
 				expression.NewEquals(fieldAx, litOne),
 				plan.NewInnerJoin(
 					plan.NewResolvedTable(tableA, nil, nil),
-					plan.NewTableAlias("b", plan.NewResolvedTable(tableB, nil, nil)),
+					aliasB,
 					expression.NewEquals(fieldAx, fieldBy),
 				),
 			),
@@ -155,14 +162,14 @@ func TestConvertCrossJoin(t *testing.T) {
 				),
 				plan.NewCrossJoin(
 					plan.NewResolvedTable(tableA, nil, nil),
-					plan.NewTableAlias("b", plan.NewResolvedTable(tableB, nil, nil)),
+					aliasB,
 				),
 			),
 			expected: plan.NewFilter(
 				expression.NewEquals(fieldAx, litOne),
 				plan.NewInnerJoin(
 					plan.NewResolvedTable(tableA, nil, nil),
-					plan.NewTableAlias("b", plan.NewResolvedTable(tableB, nil, nil)),
+					aliasB,
 					expression.NewOr(
 						expression.NewEquals(fieldAx, fieldBy),
 						expression.NewEquals(fieldAx, litOne),
@@ -195,10 +202,10 @@ func TestConvertCrossJoin(t *testing.T) {
 				plan.NewCrossJoin(
 					plan.NewResolvedTable(tableA, nil, nil),
 					plan.NewCrossJoin(
-						plan.NewTableAlias("b", plan.NewResolvedTable(tableB, nil, nil)),
+						aliasB,
 						plan.NewCrossJoin(
-							plan.NewTableAlias("c", plan.NewResolvedTable(tableB, nil, nil)),
-							plan.NewTableAlias("d", plan.NewResolvedTable(tableB, nil, nil)),
+							aliasC,
+							aliasD,
 						),
 					),
 				),
@@ -211,10 +218,10 @@ func TestConvertCrossJoin(t *testing.T) {
 				plan.NewInnerJoin(
 					plan.NewResolvedTable(tableA, nil, nil),
 					plan.NewInnerJoin(
-						plan.NewTableAlias("b", plan.NewResolvedTable(tableB, nil, nil)),
+						aliasB,
 						plan.NewInnerJoin(
-							plan.NewTableAlias("c", plan.NewResolvedTable(tableB, nil, nil)),
-							plan.NewTableAlias("d", plan.NewResolvedTable(tableB, nil, nil)),
+							aliasC,
+							aliasD,
 							expression.NewEquals(
 								expression.NewGetFieldWithTable(0, 0, types.Int64, "db", "c", "x", false),
 								expression.NewGetFieldWithTable(0, 1, types.Int64, "db", "d", "y", false),
@@ -242,10 +249,10 @@ func TestConvertCrossJoin(t *testing.T) {
 				plan.NewCrossJoin(
 					plan.NewResolvedTable(tableA, nil, nil),
 					plan.NewCrossJoin(
-						plan.NewTableAlias("b", plan.NewResolvedTable(tableB, nil, nil)),
+						aliasB,
 						plan.NewCrossJoin(
-							plan.NewTableAlias("c", plan.NewResolvedTable(tableB, nil, nil)),
-							plan.NewTableAlias("d", plan.NewResolvedTable(tableB, nil, nil)),
+							aliasC,
+							aliasD,
 						),
 					),
 				),
@@ -253,10 +260,10 @@ func TestConvertCrossJoin(t *testing.T) {
 			expected: plan.NewInnerJoin(
 				plan.NewResolvedTable(tableA, nil, nil),
 				plan.NewInnerJoin(
-					plan.NewTableAlias("b", plan.NewResolvedTable(tableB, nil, nil)),
+					aliasB,
 					plan.NewCrossJoin(
-						plan.NewTableAlias("c", plan.NewResolvedTable(tableB, nil, nil)),
-						plan.NewTableAlias("d", plan.NewResolvedTable(tableB, nil, nil)),
+						aliasC,
+						aliasD,
 					),
 					expression.NewEquals(
 						expression.NewGetFieldWithTable(0, 0, types.Int64, "db", "b", "x", false),

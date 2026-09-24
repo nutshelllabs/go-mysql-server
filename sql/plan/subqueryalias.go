@@ -36,6 +36,8 @@ type SubqueryAlias struct {
 	ScopeMapping         map[sql.ColumnId]sql.Expression
 	id                   sql.TableId
 	cols                 sql.ColSet
+	// schemaMemo caches Schema(); see schema_memo.go. Nil for nodes not built by NewSubqueryAlias (never caches).
+	schemaMemo *schemaMemo
 }
 
 var _ sql.Node = (*SubqueryAlias)(nil)
@@ -49,6 +51,7 @@ func NewSubqueryAlias(name, textDefinition string, node sql.Node) *SubqueryAlias
 		name:                 name,
 		TextDefinition:       textDefinition,
 		OuterScopeVisibility: false,
+		schemaMemo:           newSchemaMemo(),
 	}
 }
 
@@ -87,6 +90,7 @@ func (sq *SubqueryAlias) Name() string { return sq.name }
 func (sq *SubqueryAlias) WithName(n string) sql.Node {
 	ret := *sq
 	ret.name = n
+	ret.schemaMemo = newSchemaMemo()
 	return &ret
 }
 
@@ -94,8 +98,21 @@ func (sq *SubqueryAlias) IsReadOnly() bool {
 	return sq.Child.IsReadOnly()
 }
 
-// Schema implements the Node interface.
+// Schema implements the Node interface. The result is memoized while the child, the name and the contents of
+// ColumnNames are unchanged; callers must not modify the returned slice or its columns.
 func (sq *SubqueryAlias) Schema() sql.Schema {
+	if ns := sq.schemaMemo.load(); ns != nil && ns.child == sq.Child && ns.name == sq.name && sameStrings(ns.colNames, sq.ColumnNames) {
+		return ns.schema
+	}
+	s := sq.computeSchema()
+	if memoizableChild(sq.Child) {
+		sq.schemaMemo.store(&nodeSchema{child: sq.Child, name: sq.name, colNames: cloneStrings(sq.ColumnNames), schema: s})
+	}
+	return s
+}
+
+// computeSchema computes the schema of sq without consulting or updating the memo.
+func (sq *SubqueryAlias) computeSchema() sql.Schema {
 	childSchema := sq.Child.Schema()
 	schema := make(sql.Schema, len(childSchema))
 	for i, col := range childSchema {
@@ -117,6 +134,7 @@ func (sq *SubqueryAlias) WithChildren(children ...sql.Node) (sql.Node, error) {
 
 	nn := *sq
 	nn.Child = children[0]
+	nn.schemaMemo = newSchemaMemo()
 	return &nn, nil
 }
 
@@ -128,6 +146,7 @@ func (sq *SubqueryAlias) CollationCoercibility(ctx *sql.Context) (collation sql.
 func (sq *SubqueryAlias) WithChild(n sql.Node) *SubqueryAlias {
 	ret := *sq
 	ret.Child = n
+	ret.schemaMemo = newSchemaMemo()
 	return &ret
 }
 
@@ -189,5 +208,6 @@ func (sq *SubqueryAlias) DebugString() string {
 func (sq *SubqueryAlias) WithColumnNames(columns []string) *SubqueryAlias {
 	ret := *sq
 	ret.ColumnNames = columns
+	ret.schemaMemo = newSchemaMemo()
 	return &ret
 }

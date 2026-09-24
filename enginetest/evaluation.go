@@ -418,7 +418,29 @@ func testQueryWithContext(
 	require.Equal(
 		0, ctx.Memory.NumCaches())
 	validateEngine(t, ctx, harness, e)
+
+	if VerifySchemaMemo && len(bindings) == 0 && !IsServerEngine(e) && !isExecuteStatement(q) {
+		if n, err := e.AnalyzeQuery(ctx, q); err == nil {
+			require.NoError(plan.VerifySchemaMemo(n), "schema memo mismatch for query %s", q)
+		}
+	}
 }
+
+// isExecuteStatement reports whether q is an EXECUTE statement. The engine binds those through
+// bindExecuteQueryNode before analysis; running the analyzer over the raw *plan.ExecuteQuery panics.
+func isExecuteStatement(q string) bool {
+	stmt, err := sqlparser.Parse(q)
+	if err != nil {
+		return false
+	}
+	_, ok := stmt.(*sqlparser.Execute)
+	return ok
+}
+
+// VerifySchemaMemo enables, in testQueryWithContext, a re-analysis of every successfully run query without bindings
+// (non-server engines only) followed by plan.VerifySchemaMemo over the analyzed plan, which fails the test when any
+// memoized Project/TableAlias/SubqueryAlias schema differs from a fresh recomputation.
+var VerifySchemaMemo = true
 
 func GetFilterIndex(n sql.Node) sql.IndexLookup {
 	var lookup sql.IndexLookup

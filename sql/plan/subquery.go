@@ -220,6 +220,7 @@ func PrependRowInPlan(row sql.Row, lateral bool) func(n sql.Node) (sql.Node, tra
 				newSubqueryAlias := *n
 				newChildNode, _, err := transform.Node(n.Child, PrependRowInPlan(row, lateral))
 				newSubqueryAlias.Child = newChildNode
+				newSubqueryAlias.schemaMemo = newSchemaMemo()
 				return &newSubqueryAlias, transform.NewTree, err
 			} else {
 				return NewPrependNode(n, row), transform.NewTree, nil
@@ -523,7 +524,7 @@ func (s *Subquery) Resolved() bool {
 func (s *Subquery) Type() sql.Type {
 	qs := s.Query.Schema()
 	if len(qs) == 1 {
-		return s.Query.Schema()[0].Type
+		return qs[0].Type
 	}
 	ts := make([]sql.Type, len(qs))
 	for i, c := range qs {

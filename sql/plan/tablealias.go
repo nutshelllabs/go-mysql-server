@@ -25,6 +25,8 @@ type TableAlias struct {
 	comment string
 	id      sql.TableId
 	cols    sql.ColSet
+	// schemaMemo caches Schema(); see schema_memo.go. Nil for nodes not built by NewTableAlias (never caches).
+	schemaMemo *schemaMemo
 }
 
 var _ sql.RenameableNode = (*TableAlias)(nil)
@@ -33,7 +35,11 @@ var _ sql.CollationCoercible = (*TableAlias)(nil)
 
 // NewTableAlias returns a new Table alias node.
 func NewTableAlias(name string, node sql.Node) *TableAlias {
-	ret := &TableAlias{UnaryNode: &UnaryNode{Child: node}, name: name}
+	ret := &TableAlias{
+		UnaryNode:  &UnaryNode{Child: node},
+		name:       name,
+		schemaMemo: newSchemaMemo(),
+	}
 	if tin, ok := node.(TableIdNode); ok {
 		ret.id = tin.Id()
 		ret.cols = tin.Columns()
@@ -85,8 +91,21 @@ func (t *TableAlias) Comment() string {
 }
 
 // Schema implements the Node interface. TableAlias alters the schema of its child element to rename the source of
-// columns to the alias.
+// columns to the alias. The result is memoized while the child and the name are unchanged; callers must not modify
+// the returned slice or its columns.
 func (t *TableAlias) Schema() sql.Schema {
+	if ns := t.schemaMemo.load(); ns != nil && ns.child == t.Child && ns.name == t.name {
+		return ns.schema
+	}
+	s := t.computeSchema()
+	if memoizableChild(t.Child) {
+		t.schemaMemo.store(&nodeSchema{child: t.Child, name: t.name, schema: s})
+	}
+	return s
+}
+
+// computeSchema computes the schema of t without consulting or updating the memo.
+func (t *TableAlias) computeSchema() sql.Schema {
 	childSchema := t.Child.Schema()
 	copy := make(sql.Schema, len(childSchema))
 	for i, col := range childSchema {
@@ -118,21 +137,26 @@ func (t *TableAlias) CollationCoercibility(ctx *sql.Context) (collation sql.Coll
 	return sql.Collation_binary, 7
 }
 
-func (t TableAlias) String() string {
+// String implements the fmt.Stringer interface.
+func (t *TableAlias) String() string {
 	pr := sql.NewTreePrinter()
 	_ = pr.WriteNode("TableAlias(%s)", t.name)
 	_ = pr.WriteChildren(t.Child.String())
 	return pr.String()
 }
 
-func (t TableAlias) DebugString() string {
+// DebugString implements the sql.DebugStringer interface.
+func (t *TableAlias) DebugString() string {
 	pr := sql.NewTreePrinter()
 	_ = pr.WriteNode("TableAlias(%s)", t.name)
 	_ = pr.WriteChildren(sql.DebugString(t.Child))
 	return pr.String()
 }
 
-func (t TableAlias) WithName(name string) sql.Node {
-	t.name = name
-	return &t
+// WithName implements sql.RenameableNode. The copy gets a fresh schema memo, since the name is a schema input.
+func (t *TableAlias) WithName(name string) sql.Node {
+	nt := *t
+	nt.name = name
+	nt.schemaMemo = newSchemaMemo()
+	return &nt
 }

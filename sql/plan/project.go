@@ -29,6 +29,8 @@ type Project struct {
 	Projections []sql.Expression
 	CanDefer    bool
 	deps        sql.ColSet
+	// schemaMemo caches Schema(); see schema_memo.go. Nil for nodes not built by NewProject (never caches).
+	schemaMemo *schemaMemo
 }
 
 var _ sql.Expressioner = (*Project)(nil)
@@ -41,6 +43,7 @@ func NewProject(expressions []sql.Expression, child sql.Node) *Project {
 	return &Project{
 		UnaryNode:   UnaryNode{child},
 		Projections: expressions,
+		schemaMemo:  newSchemaMemo(),
 	}
 }
 
@@ -114,8 +117,21 @@ func ExprDeps(exprs ...sql.Expression) sql.ColSet {
 	return deps
 }
 
-// Schema implements the Node interface.
+// Schema implements the Node interface. The result is memoized while the child and the projection slice are
+// unchanged; callers must not modify the returned slice or its columns.
 func (p *Project) Schema() sql.Schema {
+	if ns := p.schemaMemo.load(); ns != nil && ns.child == p.Child && sameExprSlice(ns.projs, p.Projections) {
+		return ns.schema
+	}
+	s := p.computeSchema()
+	if memoizableChild(p.Child) {
+		p.schemaMemo.store(&nodeSchema{child: p.Child, projs: p.Projections, schema: s})
+	}
+	return s
+}
+
+// computeSchema computes the schema of p without consulting or updating the memo.
+func (p *Project) computeSchema() sql.Schema {
 	var s = make(sql.Schema, len(p.Projections))
 	for i, expr := range p.Projections {
 		s[i] = transform.ExpressionToColumn(expr, AliasSubqueryString(expr))
@@ -184,6 +200,7 @@ func (p *Project) WithChildren(children ...sql.Node) (sql.Node, error) {
 	}
 	np := *p
 	np.Child = children[0]
+	np.schemaMemo = newSchemaMemo()
 	return &np, nil
 }
 
@@ -199,9 +216,12 @@ func (p *Project) WithExpressions(exprs ...sql.Expression) (sql.Node, error) {
 	}
 	np := *p
 	np.Projections = exprs
+	np.schemaMemo = newSchemaMemo()
 	return &np, nil
 }
 
+// WithCanDefer returns a copy of p with CanDefer set. The copy shares p's schema memo, since CanDefer does not
+// affect the schema.
 func (p *Project) WithCanDefer(canDefer bool) *Project {
 	np := *p
 	np.CanDefer = canDefer
