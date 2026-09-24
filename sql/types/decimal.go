@@ -256,7 +256,7 @@ func (t DecimalType_) ConvertToNullDecimal(v interface{}) (decimal.NullDecimal, 
 	case *big.Rat:
 		return t.ConvertToNullDecimal(new(big.Float).SetRat(value))
 	case decimal.Decimal:
-		if t.definesColumn && value.Exponent() != int32(t.scale) {
+		if t.definesColumn && value.Exponent() != -int32(t.scale) {
 			val, err := decimal.NewFromString(value.StringFixed(int32(t.scale)))
 			if err != nil {
 				return decimal.NullDecimal{}, err

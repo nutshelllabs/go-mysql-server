@@ -552,3 +552,66 @@ func BenchmarkDecimalBoundsCheckReference(b *testing.B) {
 		_, _, _ = boundsCheckReference(typ, v)
 	}
 }
+
+// convertColumnDecimalReference is a copy of the decimal.Decimal branch of ConvertToNullDecimal before the sign fix:
+// it compared the exponent against +scale instead of -scale.
+func convertColumnDecimalReference(t DecimalType_, v decimal.Decimal) (decimal.Decimal, error) {
+	if t.definesColumn && v.Exponent() != int32(t.scale) {
+		return decimal.NewFromString(v.StringFixed(int32(t.scale)))
+	}
+	return v, nil
+}
+
+// TestDecimalColumnConvertAtScale checks ConvertToNullDecimal on decimal inputs against the pre-fix reference: values
+// are always numerically equal, exponents are equal except for exponent +scale (scale > 0), which column types now
+// normalize to -scale. Non-column types must be unaffected.
+func TestDecimalColumnConvertAtScale(t *testing.T) {
+	types := []DecimalType_{
+		MustCreateColumnDecimalType(10, 2).(DecimalType_),
+		MustCreateColumnDecimalType(18, 2).(DecimalType_),
+		MustCreateColumnDecimalType(5, 0).(DecimalType_),
+		MustCreateColumnDecimalType(10, 10).(DecimalType_),
+	}
+	nonColumn := MustCreateDecimalType(18, 2).(DecimalType_)
+	for _, typ := range types {
+		t.Run(fmt.Sprintf("%d_%d", typ.precision, typ.scale), func(t *testing.T) {
+			s := int32(typ.scale)
+			exps := []int32{-s - 1, -s, 0, s, s + 1}
+			if s > 0 {
+				exps = append(exps, -s+1)
+			}
+			for _, exp := range exps {
+				for _, coef := range []int64{3, -3, 0, 12345, -12345} {
+					v := decimal.New(coef, exp)
+					got, err := typ.ConvertToNullDecimal(v)
+					require.NoError(t, err)
+					require.True(t, got.Valid)
+					want, err := convertColumnDecimalReference(typ, v)
+					require.NoError(t, err)
+					require.Equal(t, 0, got.Decimal.Cmp(want), "value %s (exp %d)", v, exp)
+					if s > 0 && exp == s {
+						require.Equal(t, s, want.Exponent(), "reference skips normalization at exp +scale")
+						require.Equal(t, -s, got.Decimal.Exponent(), "value %s (exp %d) must be normalized", v, exp)
+					} else {
+						require.Equal(t, want.Exponent(), got.Decimal.Exponent(), "value %s (exp %d)", v, exp)
+					}
+
+					// A non-column type returns the value unchanged.
+					nc, err := nonColumn.ConvertToNullDecimal(v)
+					require.NoError(t, err)
+					require.Equal(t, 0, nc.Decimal.Cmp(v))
+					require.Equal(t, v.Exponent(), nc.Decimal.Exponent())
+				}
+			}
+		})
+	}
+
+	typ := MustCreateColumnDecimalType(18, 2).(DecimalType_)
+	v := decimal.RequireFromString("-1234.56")
+	// Box the argument once so only ConvertToNullDecimal's own allocations are counted.
+	var boxed interface{} = v
+	allocs := testing.AllocsPerRun(1000, func() { _, _ = typ.ConvertToNullDecimal(boxed) })
+	ref := testing.AllocsPerRun(1000, func() { _, _ = convertColumnDecimalReference(typ, v) })
+	t.Logf("column DECIMAL(18,2) ConvertToNullDecimal(-1234.56) allocs: new = %v, reference = %v", allocs, ref)
+	require.Equal(t, 0.0, allocs)
+}
