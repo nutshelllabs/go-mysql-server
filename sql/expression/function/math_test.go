@@ -242,6 +242,31 @@ func TestSignFunc(t *testing.T) {
 	tf.AddSignedVariations(int8(0), 0)
 	tf.AddUnsignedVariations(int8(0), 0)
 	tf.AddFloatVariations(int8(0), 0)
+
+	// fractional values keep their sign.  The sign must come from the value itself, not from an integer conversion,
+	// which rounds every magnitude below 0.5 to zero.
+	tf.AddFloatVariations(int8(1), 0.3)
+	tf.AddFloatVariations(int8(-1), -0.3)
+	tf.AddFloatVariations(int8(1), 0.49)
+	tf.AddFloatVariations(int8(-1), -0.49)
+	tf.AddFloatVariations(int8(1), 0.5)
+	tf.AddFloatVariations(int8(-1), -0.5)
+	tf.AddFloatVariations(int8(1), 0.0001)
+	tf.AddFloatVariations(int8(-1), -0.0001)
+	tf.AddSucceeding(int8(1), decimal.RequireFromString("0.000000000000000000000000000001"))
+	tf.AddSucceeding(int8(-1), decimal.RequireFromString("-0.000000000000000000000000000001"))
+	tf.AddSucceeding(int8(0), decimal.RequireFromString("0.000"))
+	tf.AddSucceeding(int8(0), math.Copysign(0, -1))
+
+	// values outside the int64 range, and the float specials
+	tf.AddSucceeding(int8(1), 1e30)
+	tf.AddSucceeding(int8(-1), -1e30)
+	tf.AddSucceeding(int8(1), decimal.RequireFromString("99999999999999999999999999999.5"))
+	tf.AddSucceeding(int8(-1), decimal.RequireFromString("-99999999999999999999999999999.5"))
+	tf.AddSucceeding(int8(1), math.Inf(1))
+	tf.AddSucceeding(int8(-1), math.Inf(-1))
+	tf.AddSucceeding(int8(0), math.NaN())
+
 	tf.AddSucceeding(int8(1), time.Now())
 	tf.AddSucceeding(int8(0), false)
 	tf.AddSucceeding(int8(1), true)
@@ -257,6 +282,42 @@ func TestSignFunc(t *testing.T) {
 	tf.AddSucceeding(int8(1), "0.1a,1,1")
 	tf.AddSucceeding(int8(0), "-0,1,1")
 	tf.AddSucceeding(int8(0), "-.z1,1,1")
+
+	// a leading plus sign is part of the numeric portion
+	tf.AddSucceeding(int8(1), "+0.3")
+	tf.AddSucceeding(int8(1), "+.5")
+	tf.AddSucceeding(int8(1), "+1z1Xaoebu")
+	tf.AddSucceeding(int8(0), "+0")
+	tf.AddSucceeding(int8(0), "+")
+	tf.AddSucceeding(int8(0), "+-1")
+	tf.AddSucceeding(int8(0), "+z1")
+
+	// leading whitespace is skipped, as mysql's string-to-double conversion does: space, \t, \n, \v, \f and \r,
+	// ahead of the sign only
+	tf.AddSucceeding(int8(1), " 5")
+	tf.AddSucceeding(int8(-1), " -5")
+	tf.AddSucceeding(int8(1), "   +0.3")
+	tf.AddSucceeding(int8(-1), "\t-0.3")
+	tf.AddSucceeding(int8(1), "\n.5")
+	tf.AddSucceeding(int8(-1), "\v-1")
+	tf.AddSucceeding(int8(1), "\f1")
+	tf.AddSucceeding(int8(-1), "\r-1")
+	tf.AddSucceeding(int8(1), " \t\n\v\f\r1z1Xaoebu")
+	tf.AddSucceeding(int8(1), "5 ")
+	tf.AddSucceeding(int8(0), " 0")
+	tf.AddSucceeding(int8(0), " -0.0")
+	tf.AddSucceeding(int8(0), "")
+	tf.AddSucceeding(int8(0), "   ")
+	tf.AddSucceeding(int8(0), " z1")
+
+	// whitespace after the sign ends the numeric portion, and other space characters are not skipped
+	tf.AddSucceeding(int8(0), "- 5")
+	tf.AddSucceeding(int8(0), "+ 5")
+	tf.AddSucceeding(int8(0), " - 5")
+	tf.AddSucceeding(int8(0), "-\t5")
+	tf.AddSucceeding(int8(0), " 5")
+	tf.AddSucceeding(int8(0), " -5")
+	tf.AddSucceeding(int8(0), "\x005")
 
 	tf.Test(t, nil, nil)
 }

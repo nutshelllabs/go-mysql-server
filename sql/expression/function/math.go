@@ -779,8 +779,24 @@ func NewSign(arg sql.Expression) sql.Expression {
 	return &Sign{NewUnaryFunc(arg, "SIGN", types.Int8)}
 }
 
-var negativeSignRegex = regexp.MustCompile(`^-[0-9]*\.?[0-9]*[1-9]`)
-var positiveSignRegex = regexp.MustCompile(`^+?[0-9]*\.?[0-9]*[1-9]`)
+// The sign regexes read the numeric portion at the start of a string the way MySQL's string-to-double conversion
+// (my_strtod) does. Leading whitespace is skipped, and only ahead of the sign: MySQL skips exactly the six bytes in
+// the class below. The class is spelled out because `\s` leaves out the vertical tab.
+var negativeSignRegex = regexp.MustCompile(`^[ \t\n\v\f\r]*-[0-9]*\.?[0-9]*[1-9]`)
+var positiveSignRegex = regexp.MustCompile(`^[ \t\n\v\f\r]*\+?[0-9]*\.?[0-9]*[1-9]`)
+
+// signOfFloat returns -1, 0 or 1 by the sign of f. It compares the value
+// itself, because a conversion to an integer first rounds every magnitude
+// below 0.5 to zero. NaN has no sign and yields 0.
+func signOfFloat(f float64) int8 {
+	if f > 0 {
+		return 1
+	} else if f < 0 {
+		return -1
+	}
+
+	return 0
+}
 
 // Description implements sql.FunctionExpression
 func (s *Sign) Description() string {
@@ -804,7 +820,7 @@ func (s *Sign) Eval(ctx *sql.Context, row sql.Row) (interface{}, error) {
 	}
 
 	switch typedVal := arg.(type) {
-	case int8, int16, int32, int64, float64, float32, int, decimal.Decimal:
+	case int8, int16, int32, int64, int:
 		val, _, err := types.Int64.Convert(ctx, arg)
 
 		if err != nil {
@@ -819,6 +835,17 @@ func (s *Sign) Eval(ctx *sql.Context, row sql.Row) (interface{}, error) {
 		}
 
 		return int8(1), nil
+
+	// Fractional types take their sign from the value itself. An Int64
+	// conversion rounds, so it reported every magnitude below 0.5 as zero.
+	case float32:
+		return signOfFloat(float64(typedVal)), nil
+
+	case float64:
+		return signOfFloat(typedVal), nil
+
+	case decimal.Decimal:
+		return int8(typedVal.Sign()), nil
 
 	case uint8, uint16, uint32, uint64, uint:
 		val, _, err := types.Uint64.Convert(ctx, arg)

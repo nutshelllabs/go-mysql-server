@@ -5527,6 +5527,18 @@ SELECT * FROM cte WHERE  d = 2;`,
 		},
 	},
 	{
+		Query: "SELECT SIGN(0.3), SIGN(-0.3), SIGN(0.3e0), SIGN(-0.3e0), SIGN(0.5), SIGN(0.0), SIGN('+0.3'), SIGN('-0.3')",
+		Expected: []sql.Row{
+			{1, -1, 1, -1, 1, 0, 1, -1},
+		},
+	},
+	{
+		Query: "SELECT SIGN(' 0.3'), SIGN('  -0.3'), SIGN('\\t+0.3'), SIGN('\\n-0.3'), SIGN('- 0.3'), SIGN('   ')",
+		Expected: []sql.Row{
+			{1, -1, 1, -1, 0, 0},
+		},
+	},
+	{
 		Query: "SELECT ASCII(s) from mytable order by i limit 1",
 		Expected: []sql.Row{
 			{uint64(0x66)},
